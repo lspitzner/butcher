@@ -1,0 +1,13 @@
+*.glade~
+*.prof
+*.aux
+*.eventlog
+*.hp
+*.ps
+/*.pdf
+dist
+.cabal-sandbox/
+.stack-work/
+cabal.sandbox.config
+**/*.gui~
+\#*.gui\#
