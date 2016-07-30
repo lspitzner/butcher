@@ -10,7 +10,7 @@ where
 
 
 
-#include "qprelude/bundle-gamma.inc"
+#include "prelude.inc"
 
 import qualified Text.PrettyPrint as PP
 

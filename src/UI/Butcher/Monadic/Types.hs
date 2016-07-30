@@ -27,7 +27,7 @@ where
 
 
 
-#include "qprelude/bundle-gamma.inc"
+#include "prelude.inc"
 import           Control.Monad.Free
 import qualified Control.Monad.Trans.MultiState.Strict as MultiStateS
 -- import           Data.Unique (Unique)

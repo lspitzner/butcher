@@ -21,7 +21,7 @@ where
 
 
 
-#include "qprelude/bundle-gamma.inc"
+#include "prelude.inc"
 import           Control.Monad.Free
 import qualified Control.Monad.Trans.MultiRWS.Strict as MultiRWSS
 import qualified Control.Monad.Trans.MultiState.Strict as MultiStateS
@@ -66,7 +66,7 @@ ppUsageAt :: [String] -- (sub)command sequence
 ppUsageAt strings desc =
   case strings of
     [] -> Just $ ppUsage desc
-    (s:sr) -> find ((s==) . fst) (_cmd_children desc) >>= snd .> ppUsageAt sr
+    (s:sr) -> find ((s==) . fst) (_cmd_children desc) >>= ppUsageAt sr . snd
 
 ppHelpShallow :: CommandDesc a
               -> PP.Doc

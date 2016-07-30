@@ -34,7 +34,6 @@ library
     , free
     , unsafe
     , lens
-    , qualified-prelude
     , multistate
     , pretty
     , containers
@@ -75,6 +74,8 @@ library
   if flag(butcher-dev) {
     ghc-options: -O0 -Werror
   }
+  include-dirs:
+    srcinc
 
 test-suite tests
   type:             exitcode-stdio-1.0
@@ -85,7 +86,6 @@ test-suite tests
     , free
     , unsafe
     , lens
-    , qualified-prelude
     , multistate
     , pretty
     , containers
