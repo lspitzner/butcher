@@ -143,7 +143,7 @@ addFlagReadParamAll
   -> Flag p
   -> (p -> f ())
   -> CmdParser f out [p]
-addFlagReadParamAll shorts longs name flag act = addCmdPartManyA desc parseF act
+addFlagReadParamAll shorts longs name flag act = addCmdPartManyInpA desc parseF act
   where
     allStrs = fmap (\c -> "-"++[c]) shorts
            ++ fmap (\s -> "--"++s)  longs
@@ -153,15 +153,23 @@ addFlagReadParamAll shorts longs name flag act = addCmdPartManyA desc parseF act
     desc1 = PartAlts $ PartLiteral <$> allStrs
     desc2 = (maybe id (PartDefault . show) $ _flag_default flag)
           $ PartVariable name
-    parseF :: String -> Maybe (p, String)
-    parseF str = flip firstJust allStrs
-               $ \s -> [ t
-                       | (s ++ " ") `isPrefixOf` str
-                       , t <- case Text.Read.reads $ drop (length s + 1) str of
-                          ((x, ' ':r):_) -> Just (x, dropWhile Char.isSpace r)
-                          ((x, []):_)    -> Just (x, [])
-                          _ -> _flag_default flag <&> \x -> (x, s)
-                       ]
+    parseF :: Input -> Maybe (p, Input)
+    parseF inp = case inp of
+      InputString str -> flip firstJust allStrs $ \s ->
+        [ t
+        | (s ++ " ") `isPrefixOf` str
+        , let rest = drop (length s + 1) str
+        , t <- case Text.Read.reads rest of
+           ((x, ' ':r):_) -> Just (x, InputString $ dropWhile Char.isSpace r)
+           ((x, ""):_)    -> Just (x, InputString $ "")
+           _ -> _flag_default flag <&> \x -> (x, InputString rest)
+        ]
+      InputArgs (arg1:argR) | any (==arg1) allStrs -> case argR of
+        [] -> _flag_default flag <&> \d -> (d, InputArgs argR)
+        (arg2:rest) -> case readMaybe arg2 of
+          Just x -> Just (x, InputArgs rest)
+          Nothing -> _flag_default flag <&> \d -> (d, InputArgs argR)
+      InputArgs _ -> Nothing
 
 addFlagStringParam
   :: forall f out
