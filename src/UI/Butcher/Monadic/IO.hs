@@ -28,6 +28,8 @@ import           UI.Butcher.Monadic.Types
 import           UI.Butcher.Monadic.Core
 import           UI.Butcher.Monadic.Pretty
 
+import           System.IO
+
 
 
 mainFromCmdParser :: CmdParser Identity (IO ()) () -> IO ()
@@ -35,15 +37,15 @@ mainFromCmdParser cmd = do
   progName <- System.Environment.getProgName
   case cmdCheckParser (Just progName) cmd of
     Left e -> do
-      putStrLn $ progName ++ ": internal error: failed sanity check for butcher main command parser!"
-      putStrLn $ "(" ++ e ++ ")"
-      putStrLn $ "aborting."
+      putStrErrLn $ progName ++ ": internal error: failed sanity check for butcher main command parser!"
+      putStrErrLn $ "(" ++ e ++ ")"
+      putStrErrLn $ "aborting."
     Right _ -> do
       args <- System.Environment.getArgs
       case cmdRunParser (Just progName) (InputArgs args) cmd of
         (desc, Left (ParsingError mess remaining)) -> do
-          putStrLn $ progName ++ ": error parsing arguments: " ++ head mess
-          putStrLn $ case remaining of
+          putStrErrLn $ progName ++ ": error parsing arguments: " ++ head mess
+          putStrErrLn $ case remaining of
             InputString "" -> "at the end of input."
             InputString str -> case show str of
               s | length s < 42 -> "at: " ++ s ++ "."
@@ -52,12 +54,12 @@ mainFromCmdParser cmd = do
             InputArgs xs -> case List.unwords $ show <$> xs of
               s | length s < 42 -> "at: " ++ s ++ "."
               s -> "at: " ++ take 40 s ++ "..\"."
-          putStrLn $ "usage:"
-          print $ ppUsage desc
+          putStrErrLn $ "usage:"
+          printErr $ ppUsage desc
         (desc, Right out) -> case _cmd_out out of
           Nothing -> do
-            putStrLn $ "usage:"
-            print $ ppUsage desc
+            putStrErrLn $ "usage:"
+            printErr $ ppUsage desc
           Just a -> a
 
 addHelpCommand :: Applicative f => CmdParser f (IO ()) ()
@@ -71,3 +73,9 @@ addButcherDebugCommand = addCmd "butcherdebug" $ do
   desc <- peekCmdDesc
   addCmdImpl $ do
     print $ maybe undefined snd (_cmd_mParent desc)
+
+putStrErrLn :: String -> IO ()
+putStrErrLn s = hPutStrLn stderr s
+
+printErr :: Show a => a -> IO ()
+printErr = putStrErrLn . show
