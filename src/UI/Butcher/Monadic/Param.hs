@@ -5,6 +5,8 @@ module UI.Butcher.Monadic.Param
   , paramDefault
   , addReadParam
   , addReadParamOpt
+  , addStringParam
+  , addStringParamOpt
   )
 where
 
@@ -86,3 +88,43 @@ addReadParamOpt name par = addCmdPart desc parseF
       ((x, ' ':r):_) -> Just (Just x, dropWhile Char.isSpace r)
       ((x, []):_)    -> Just (Just x, [])
       _ -> Just (Nothing, s) -- TODO: we could warn about a default..
+
+addStringParam
+  :: forall f out . (Applicative f)
+  => String
+  -> Param String
+  -> CmdParser f out String
+addStringParam name par = addCmdPartInp desc parseF
+  where
+    desc :: PartDesc
+    desc = PartOptional
+         $ (maybe id PartWithHelp $ _param_help par)
+         $ PartVariable name
+    parseF :: Input -> Maybe (String, Input)
+    parseF (InputString str)
+      = case break (not . Char.isSpace) str of
+          ("", rest) -> _param_default par <&> \x -> (x, InputString rest)
+          (x, rest) -> Just (x, InputString rest)
+    parseF (InputArgs args) = case args of
+      (s1:sR) -> Just (s1, InputArgs sR)
+      []      -> _param_default par <&> \x -> (x, InputArgs args)
+
+addStringParamOpt
+  :: forall f out . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out (Maybe String)
+addStringParamOpt name par = addCmdPartInp desc parseF
+  where
+    desc :: PartDesc
+    desc = PartOptional
+         $ (maybe id PartWithHelp $ _param_help par)
+         $ PartVariable name
+    parseF :: Input -> Maybe (Maybe String, Input)
+    parseF (InputString str)
+      = case break (not . Char.isSpace) str of
+          ("", rest) -> Just (Nothing, InputString rest)
+          (x, rest) -> Just (Just x, InputString rest)
+    parseF (InputArgs args) = case args of
+      (s1:sR) -> Just (Just s1, InputArgs sR)
+      []      -> Just (Nothing, InputArgs [])
