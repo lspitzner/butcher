@@ -13,7 +13,8 @@ The main differences are:
 
 * Exposes an evil monadic interface, which allows for much nicer binding of
   command part results to some variable name, where in `optparse-applicative`
-  you easily lose track of what field you are modifying after the 5th `<*>`.
+  you easily lose track of what field you are modifying after the 5th `<*>`
+  (admittedly, i think -XRecordWildCards improves on that issue already.)
 
     Evil, because you are not allowed to use the monad's full power in this
     case, i.e. there is a constraint that is not statically enforced.
@@ -62,7 +63,7 @@ That means that checking if a combination of flags is allowed must be done
 after parsing. (But different commands and their subcommands have separate
 sets of flags.)
 
-## Package intentions
+## (abstract) Package intentions
 
 Consider a commandline invocation like "ghc -O -i src -Main.hs -o Main". This
 package provides a way for the programmer to simultaneously define the
@@ -73,9 +74,11 @@ for the user. More specifically, i had three goals in mind:
 2. Extract understandable usage/help commandline documents/texts from that
    descriptions, think of `ghc --help` or `stack init --help`.
 3. Extract necessary information to compute commandline completion results
-   from any partial input.
+   from any partial input. (This is not implemented to any serious degree.)
 
 ## Semantics
+
+(Sorry, this description is severely lacking, I know.)
 
 Basic elements of a command are flags, parameters and subcommands. These can
 be composed in certain ways, i.e. flags can have a (or possibly multiple?)
