@@ -1,0 +1,102 @@
+# see https://github.com/lspitzner/iridium
+# 
+# note that you can add a user-global .iridium.yaml
+# into $HOME, containing e.g.
+# 
+# ---
+# setup:
+#   compiler-paths:
+#     ghc-7.10.3: /opt/ghc-7.10.3/bin/ghc
+#     ghc-7.8.4:  /opt/ghc-7.8.4/bin/ghc
+# 
+#   hackage:
+#     username: user
+# ...
+# 
+
+---
+checks:
+  changelog:
+    enabled: True
+    location: "ChangeLog.md"
+  compiler-versions:
+    compilers:
+      - compiler: "ghc"
+        version: "7.10.3"
+      - compiler: "ghc"
+        version: "8.0.1"
+    compilers-help: |
+      for this to work, cabal will need the paths to the actual
+      compilers to be configured; see the note about the user-global
+      config above.
+    enabled: True
+  compiler-warnings:
+    enabled: True
+  documentation:
+    enabled: True
+  hlint:
+    enabled: False
+  lower-bounds-exist:
+    enabled: True
+  package-sdist:
+    enabled: True
+  package-sdist-help: |
+    Check that the created source distribution package will
+    actually work (for other users). This can for example
+    be not the case when you fail to mention specific files
+    in your package description.
+  testsuites:
+    enabled: True
+  upper-bounds-exist:
+    enabled: True
+  upper-bounds-stackage:
+    enabled: False
+    enabled-help: "for existing upper bounds"
+    use-nightly: False
+  upper-bounds-stackage-help: |
+    if you are completely unlucky, this might _overwrite_
+    an existing cabal.config. if you press ctrl-c in exactly
+    the right moment or something.
+process:
+  confirmation: "confirm-always"
+  confirmation-help: |
+    confirm-always     always ask for confirmation.
+    confirm-on-warning don't ask for confirmation if everything is clear.
+    confirm-on-error   only ask for confirmation if there are errors.
+  display-help: True
+  dry-run: False
+  dry-run-help: "only run all checks/tests, omit any side-effects/uploading"
+  print-summary: True
+  upload-docs: True
+  upload-docs-help: |
+    build docs locally and upload them instead of trusting the
+    docs builder which gets broken every two months.
+    implies the documentation check.
+repository:
+  git:
+    display-current-branch: True
+    push-remote:
+      enabled: True
+      remote-name-help: |
+        the "remote" configured in git to push the release/tag to.
+        remote-name: "origin"
+    push-remote-help: |
+      push the current branch (and the tag, if configured) to
+      a remote repo.
+    release-tag:
+      content: "$VERSION"
+      enabled: True
+  type: "git"
+  type-help: "none | git"
+setup:
+  buildtool: "cabal"
+  buildtool-help: "cannot be changed; stack is not supported (yet)."
+  cabal-command-help: |
+    "cabal-command: cabal"
+  hlint-command-help: |
+    "hlint-command: $HOME/.cabal/bin/hlint"
+  remote-server: "http://hackage.haskell.org"
+  remote-server-help: "This currently only checks that uploads happen to that remote, it does not change the remote if a different one is configured. (because that would require modifying `.cabal/config`,)"
+  run-cabal-update: True
+  run-cabal-update-help: "Execute cabal update before performing any checks. Useful when running the stackage upper bounds check, which may erroneously report errors if your cabal package index is not up to date."
+...
