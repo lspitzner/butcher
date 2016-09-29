@@ -4,8 +4,10 @@ module UI.Butcher.Monadic.Flag
   , addSimpleCountFlag
   , addSimpleFlagA
   , addFlagReadParam
+  , addFlagReadParams
   , addFlagReadParamA
   , addFlagStringParam
+  , addFlagStringParams
   , addFlagStringParamA
   , flagHelp
   , flagHelpStr
@@ -111,6 +113,7 @@ addSimpleCountFlag shorts longs flag = fmap length
                                     | (s ++ " ") `isPrefixOf` str ])
                              allStrs)
 
+
 addFlagReadParam
   :: forall f p out
    . (Applicative f, Typeable p, Text.Read.Read p, Show p)
@@ -118,9 +121,42 @@ addFlagReadParam
   -> [String]
   -> String -- param name
   -> Flag p
+  -> CmdParser f out p
+addFlagReadParam shorts longs name flag = addCmdPartInpA desc parseF (\_ -> pure ())
+  where
+    allStrs = fmap (\c -> "-"++[c]) shorts
+           ++ fmap (\s -> "--"++s)  longs
+    desc = (maybe id PartWithHelp $ _flag_help flag)
+         $ maybe id (PartDefault . show) (_flag_default flag)
+         $ PartSeq [desc1, desc2]
+    desc1 :: PartDesc
+    desc1 = PartAlts $ PartLiteral <$> allStrs
+    desc2 = PartVariable name
+    parseF :: Input -> Maybe (p, Input)
+    parseF inp = case inp of
+      InputString str -> case flip firstJust allStrs $ \s ->
+          [drop (length s + 1) str | (s ++ " ") `isPrefixOf` str]
+        of
+          Nothing -> _flag_default flag <&> \x -> (x, InputString str)
+          Just rest -> case Text.Read.reads rest of
+            ((x, ' ':r):_) -> Just (x, InputString $ dropWhile Char.isSpace r)
+            ((x, ""):_)    -> Just (x, InputString $ "")
+            _ -> Nothing
+      InputArgs (arg1:argR) | any (==arg1) allStrs -> case argR of
+        [] -> Nothing
+        (arg2:rest) -> readMaybe arg2 <&> \x -> (x, InputArgs rest)
+      InputArgs _ -> _flag_default flag <&> \d -> (d, inp)
+
+addFlagReadParams
+  :: forall f p out
+   . (Applicative f, Typeable p, Text.Read.Read p, Show p)
+  => String
+  -> [String]
+  -> String -- param name
+  -> Flag p
   -> CmdParser f out [p]
-addFlagReadParam shorts longs name flag
-  = addFlagReadParamAll shorts longs name flag (\_ -> pure ())
+addFlagReadParams shorts longs name flag
+  = addFlagReadParamsAll shorts longs name flag (\_ -> pure ())
 
 addFlagReadParamA
   :: forall f p out
@@ -132,9 +168,9 @@ addFlagReadParamA
   -> (p -> f ())
   -> CmdParser f out ()
 addFlagReadParamA shorts longs name flag act
-  = void $ addFlagReadParamAll shorts longs name flag act
+  = void $ addFlagReadParamsAll shorts longs name flag act
 
-addFlagReadParamAll
+addFlagReadParamsAll
   :: forall f p out
    . (Typeable p, Text.Read.Read p, Show p)
   => String
@@ -143,7 +179,7 @@ addFlagReadParamAll
   -> Flag p
   -> (p -> f ())
   -> CmdParser f out [p]
-addFlagReadParamAll shorts longs name flag act = addCmdPartManyInpA desc parseF act
+addFlagReadParamsAll shorts longs name flag act = addCmdPartManyInpA desc parseF act
   where
     allStrs = fmap (\c -> "-"++[c]) shorts
            ++ fmap (\s -> "--"++s)  longs
@@ -171,7 +207,35 @@ addFlagReadParamAll shorts longs name flag act = addCmdPartManyInpA desc parseF 
           Nothing -> _flag_default flag <&> \d -> (d, InputArgs argR)
       InputArgs _ -> Nothing
 
+
 addFlagStringParam
+  :: forall f out
+   . (Applicative f)
+  => String
+  -> [String]
+  -> String -- param name
+  -> Flag String
+  -> CmdParser f out String
+addFlagStringParam shorts longs name flag = addCmdPartInpA desc parseF (\_ -> pure ())
+  where
+    allStrs = fmap (\c -> "-"++[c]) shorts
+           ++ fmap (\s -> "--"++s)  longs
+    desc = (maybe id PartWithHelp $ _flag_help flag)
+         $ PartSeq [desc1, desc2]
+    desc1 :: PartDesc
+    desc1 = PartAlts $ PartLiteral <$> allStrs
+    desc2 = PartVariable name
+    parseF :: Input -> Maybe (String, Input)
+    parseF (InputString str) = case flip firstJust allStrs $ \s ->
+        [drop (length s + 1) str | (s ++ " ") `isPrefixOf` str]
+      of
+        Nothing -> _flag_default flag <&> \x -> (x, InputString str)
+        Just rest1 -> let (x, rest2) = break (not . Char.isSpace) rest1
+                      in Just (x, InputString rest2)
+    parseF (InputArgs (s1:s2:sr)) | any (==s1) allStrs = Just (s2, InputArgs sr)
+    parseF inp@(InputArgs _) = _flag_default flag <&> \x -> (x, inp)
+
+addFlagStringParams
   :: forall f out
    . (Applicative f)
   => String
@@ -179,8 +243,8 @@ addFlagStringParam
   -> String -- param name
   -> Flag Void
   -> CmdParser f out [String]
-addFlagStringParam shorts longs name flag
-  = addFlagStringParamAll shorts longs name flag (\_ -> pure ())
+addFlagStringParams shorts longs name flag
+  = addFlagStringParamsAll shorts longs name flag (\_ -> pure ())
 
 addFlagStringParamA
   :: forall f out
@@ -191,9 +255,9 @@ addFlagStringParamA
   -> (String -> f ())
   -> CmdParser f out ()
 addFlagStringParamA shorts longs name flag act
-  = void $ addFlagStringParamAll shorts longs name flag act
+  = void $ addFlagStringParamsAll shorts longs name flag act
 
-addFlagStringParamAll
+addFlagStringParamsAll
   :: forall f out
    . String
   -> [String]
@@ -202,7 +266,7 @@ addFlagStringParamAll
                -- with the eat-anything behaviour of the string parser.
   -> (String -> f ())
   -> CmdParser f out [String]
-addFlagStringParamAll shorts longs name flag act = addCmdPartManyInpA desc parseF act
+addFlagStringParamsAll shorts longs name flag act = addCmdPartManyInpA desc parseF act
   where
     allStrs = fmap (\c -> "-"++[c]) shorts
            ++ fmap (\s -> "--"++s)  longs
