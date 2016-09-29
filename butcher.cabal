@@ -2,7 +2,7 @@
 --  documentation, see http://haskell.org/cabal/users-guide/
 
 name:                butcher
-version:             0.1.0.0
+version:             0.2.0.0
 -- synopsis:            
 -- description:         
 license:             BSD3
@@ -12,7 +12,10 @@ maintainer:          lsp@informatik.uni-kiel.de
 -- copyright:           
 -- category:            
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+extra-source-files: {
+  ChangeLog.md
+  srcinc/prelude.inc
+}
 cabal-version:       >=1.10
 
 flag butcher-dev
@@ -30,7 +33,7 @@ library
   -- other-modules:       
   -- other-extensions:    
   build-depends:
-    { base >=4.9 && <4.10
+    { base >=4.8 && <4.10
     , free
     , unsafe
     , lens
@@ -41,6 +44,9 @@ library
     , transformers
     , mtl
     , extra
+    , nats
+    , void
+    , bifunctors
     }
   if flag(butcher-dev) {
     build-depends:
@@ -62,7 +68,6 @@ library
     LambdaCase
     MultiWayIf
     KindSignatures
-    ApplicativeDo
   }
   ghc-options: {
     -Wall
@@ -81,7 +86,7 @@ test-suite tests
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   build-depends:
-    { base >=4.9 && <4.10
+    { base >=4.8 && <4.10
     , butcher
     , free
     , unsafe

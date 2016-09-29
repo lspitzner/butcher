@@ -254,7 +254,13 @@ import qualified Data.Char as Char
 -- import qualified Data.Proxy as Proxy
 -- import qualified Data.Traversable as Traversable
 -- import qualified Data.Void as Void
+
+#if MIN_VERSION_base(4,9,0)
 import qualified GHC.OldList as List
+#else
+import qualified Data.List as List
+#endif
+
 -- import qualified Text.Printf as Printf
 
 import qualified Data.IntMap as IntMap
