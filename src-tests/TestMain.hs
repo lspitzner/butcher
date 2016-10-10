@@ -2,7 +2,7 @@ module Main where
 
 
 
-#include "qprelude/bundle-gamma.inc"
+#include "prelude.inc"
 
 import Test.Hspec
 
