@@ -17,7 +17,7 @@
 ---
 checks:
   changelog:
-    enabled: True
+    enabled: False
     location: "ChangeLog.md"
   compiler-versions:
     compilers:
@@ -37,7 +37,7 @@ checks:
   hlint:
     enabled: False
   lower-bounds-exist:
-    enabled: True
+    enabled: False
   package-sdist:
     enabled: True
   package-sdist-help: |
@@ -48,7 +48,7 @@ checks:
   testsuites:
     enabled: True
   upper-bounds-exist:
-    enabled: True
+    enabled: False
   upper-bounds-stackage:
     enabled: False
     enabled-help: "for existing upper bounds"
