@@ -21,18 +21,10 @@ where
 import           Control.Monad.Free
 import qualified Control.Monad.Trans.MultiRWS.Strict as MultiRWSS
 import qualified Control.Monad.Trans.MultiState.Strict as MultiStateS
-import           Data.Unique (Unique)
-import qualified System.Unsafe as Unsafe
-
-import qualified Control.Lens.TH as LensTH
-import qualified Control.Lens as Lens
-import           Control.Lens ( (.=), (%=), (%~), (.~) )
 
 import qualified Text.PrettyPrint as PP
 
 import           Data.HList.ContainsType
-
-import           Data.Dynamic
 
 import           UI.Butcher.Monadic.Types
 import           UI.Butcher.Monadic.Core

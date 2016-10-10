@@ -26,7 +26,9 @@ import qualified System.Info.Extra
 import qualified System.Process.Extra
 import qualified System.Time.Extra
 
-import qualified Control.Lens
+import qualified Data.Either.Combinators
+
+-- import qualified Control.Lens
 
 -- import qualified Control.Monad.Error.Lens
 -- import qualified Control.Parallel.Strategies.Lens
@@ -248,12 +250,13 @@ import qualified Data.Char as Char
 -- import qualified Data.IORef as IORef
 -- import qualified Data.Int as Int
 -- import qualified Data.Ix as Ix
--- import qualified Data.Maybe as Maybe
+import qualified Data.Maybe as Maybe
 -- import qualified Data.Monoid as Monoid
 -- import qualified Data.Ord as Ord
 -- import qualified Data.Proxy as Proxy
 -- import qualified Data.Traversable as Traversable
 -- import qualified Data.Void as Void
+import qualified Control.Monad.Trans.Writer.Strict as WriterS
 
 #if MIN_VERSION_base(4,9,0)
 import qualified GHC.OldList as List
@@ -635,5 +638,5 @@ import Control.Monad.Trans.Class          ( lift
                                           )
 import Control.Monad.Trans.Maybe          ( MaybeT (..)
                                           )
-import Control.Lens.Operators             ( (<&>)
+import Lens.Micro                         ( (<&>)
                                           )

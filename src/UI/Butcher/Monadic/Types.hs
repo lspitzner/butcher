@@ -30,15 +30,10 @@ where
 #include "prelude.inc"
 import           Control.Monad.Free
 import qualified Control.Monad.Trans.MultiState.Strict as MultiStateS
--- import           Data.Unique (Unique)
-import qualified System.Unsafe as Unsafe
 
-import qualified Control.Lens.TH as LensTH
-import qualified Control.Lens as Lens
+import qualified Lens.Micro.TH as LensTH
 
 import qualified Text.PrettyPrint as PP
-
-import           Data.Dynamic
 
 
 
@@ -156,8 +151,8 @@ instance Show (CommandDesc out) where
 
 --
 
-Lens.makeLenses ''CommandDesc
-Lens.makeLenses ''PartDesc
+LensTH.makeLenses ''CommandDesc
+LensTH.makeLenses ''PartDesc
 
 --
 

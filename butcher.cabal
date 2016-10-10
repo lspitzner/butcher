@@ -2,7 +2,7 @@
 --  documentation, see http://haskell.org/cabal/users-guide/
 
 name:                butcher
-version:             0.2.0.0
+version:             0.2.0.1
 -- synopsis:            
 -- description:         
 license:             BSD3
@@ -36,7 +36,8 @@ library
     { base >=4.8 && <4.10
     , free
     , unsafe
-    , lens
+    , microlens
+    , microlens-th
     , multistate
     , pretty
     , containers
@@ -90,7 +91,8 @@ test-suite tests
     , butcher
     , free
     , unsafe
-    , lens
+    , microlens
+    , microlens-th
     , multistate
     , pretty
     , containers

@@ -39,12 +39,9 @@ where
 import           Control.Monad.Free
 import qualified Control.Monad.Trans.MultiRWS.Strict as MultiRWSS
 import qualified Control.Monad.Trans.MultiState.Strict as MultiStateS
-import           Data.Unique (Unique)
-import qualified System.Unsafe as Unsafe
 
-import qualified Control.Lens.TH as LensTH
-import qualified Control.Lens as Lens
-import           Control.Lens ( (.=), (%=), (%~), (.~) )
+import qualified Lens.Micro as Lens
+import           Lens.Micro ( (%~), (.~) )
 
 import qualified Text.PrettyPrint as PP
 import           Text.PrettyPrint ( (<+>), ($$), ($+$) )
