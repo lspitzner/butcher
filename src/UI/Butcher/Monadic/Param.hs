@@ -131,3 +131,18 @@ addStringParamOpt name par = addCmdPartInp desc parseF
     parseF (InputArgs args) = case args of
       (s1:sR) -> Just (Just s1, InputArgs sR)
       []      -> Just (Nothing, InputArgs [])
+
+
+addRestOfInputStringParam
+  :: forall f out . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out String
+addRestOfInputStringParam name par = addCmdPartInp desc parseF
+  where
+    desc :: PartDesc
+    desc = (maybe id PartWithHelp $ _param_help par)
+         $ PartVariable name
+    parseF :: Input -> Maybe (String, Input)
+    parseF (InputString str) = Just (str, InputString "")
+    parseF (InputArgs args)  = Just (List.unwords args, InputArgs [])
