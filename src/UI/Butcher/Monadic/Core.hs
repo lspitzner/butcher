@@ -29,7 +29,9 @@ module UI.Butcher.Monadic.Core
   , reorderStop
   , cmdCheckParser
   , cmdRunParser
+  , cmdRunParserExt
   , cmdRunParserA
+  , cmdRunParserAExt
   )
 where
 
@@ -319,6 +321,9 @@ cmdCheckParser mTopLevel cmdParser
     monadMisuseError = error "CmdParser definition error - used Monad powers where only Applicative/Arrow is allowed"
 
 
+newtype PastCommandInput = PastCommandInput Input
+
+
 cmdRunParser
   :: Maybe String
   -> Input
@@ -328,6 +333,14 @@ cmdRunParser mTopLevel inputInitial cmdParser
   = runIdentity
   $ cmdRunParserA mTopLevel inputInitial cmdParser
 
+cmdRunParserExt
+  :: Maybe String
+  -> Input
+  -> CmdParser Identity out ()
+  -> (CommandDesc (), Input, Either ParsingError (CommandDesc out))
+cmdRunParserExt mTopLevel inputInitial cmdParser
+  = runIdentity
+  $ cmdRunParserAExt mTopLevel inputInitial cmdParser
 
 cmdRunParserA :: forall f out
                . Applicative f
@@ -337,7 +350,16 @@ cmdRunParserA :: forall f out
               -> f ( CommandDesc ()
                    , Either ParsingError (CommandDesc out)
                    )
-cmdRunParserA mTopLevel inputInitial cmdParser
+cmdRunParserA mTopLevel inputInitial cmdParser =
+  (\(x, _, z) -> (x, z)) <$> cmdRunParserAExt mTopLevel inputInitial cmdParser
+
+cmdRunParserAExt
+  :: forall f out . Applicative f
+  => Maybe String
+  -> Input
+  -> CmdParser f out ()
+  -> f (CommandDesc (), Input, Either ParsingError (CommandDesc out))
+cmdRunParserAExt mTopLevel inputInitial cmdParser
     = runIdentity
     $ MultiRWSS.runMultiRWSTNil
     $ (<&> captureFinal)
@@ -345,15 +367,17 @@ cmdRunParserA mTopLevel inputInitial cmdParser
     $ MultiRWSS.withMultiStateA cmdParser
     $ MultiRWSS.withMultiStateSA (StackBottom [])
     $ MultiRWSS.withMultiStateSA inputInitial
+    $ MultiRWSS.withMultiStateSA (PastCommandInput inputInitial)
     $ MultiRWSS.withMultiStateSA initialCommandDesc
     $ processMain cmdParser
   where
     initialCommandDesc = emptyCommandDesc
       { _cmd_mParent = mTopLevel <&> \n -> (n, emptyCommandDesc) }
-    captureFinal :: ([String], (CmdDescStack, (Input, (CommandDesc out, f()))))
-                 -> f (CommandDesc (), Either ParsingError (CommandDesc out))
-    captureFinal (errs, (descStack, (inputRest, (cmd, act)))) =
-        act $> (() <$ cmd', res)
+    captureFinal
+      :: ([String], (CmdDescStack, (Input, (PastCommandInput, (CommandDesc out, f())))))
+      -> f (CommandDesc (), Input, Either ParsingError (CommandDesc out))
+    captureFinal (errs, (descStack, (inputRest, (PastCommandInput pastCmdInput, (cmd, act))))) =
+        act $> (() <$ cmd', pastCmdInput, res)
       where
         errs' = errs ++ inputErrs ++ stackErrs
         inputErrs = case inputRest of
@@ -372,7 +396,7 @@ cmdRunParserA mTopLevel inputInitial cmdParser
                 -> MultiRWSS.MultiRWS
                      '[]
                      '[[String]]
-                     '[CommandDesc out, Input, CmdDescStack, CmdParser f out ()]
+                     '[CommandDesc out, PastCommandInput, Input, CmdDescStack, CmdParser f out ()]
                      (f ())
     processMain = \case
       Pure () -> return $ pure $ ()
@@ -492,10 +516,16 @@ cmdRunParserA mTopLevel inputInitial cmdParser
         case mRest of
           Nothing -> do
             cmd :: CommandDesc out <- mGet
-            subCmd <- MultiRWSS.withMultiStateS (emptyCommandDesc :: CommandDesc out)
-                    $ MultiRWSS.withMultiStateA (StackBottom [])
-                    $ iterM processCmdShallow sub
-            mSet $ cmd { _cmd_children = (cmdStr, subCmd) : _cmd_children cmd }
+            let (subCmd, subStack)
+                  = runIdentity
+                  $ MultiRWSS.runMultiRWSTNil
+                  $ MultiRWSS.withMultiStateSA (emptyCommandDesc :: CommandDesc out)
+                  $ MultiRWSS.withMultiStateS (StackBottom [])
+                  $ iterM processCmdShallow sub
+            mSet $ cmd
+              { _cmd_children = (cmdStr, postProcessCmd subStack subCmd)
+                              : _cmd_children cmd
+              }
             processMain next
           Just rest -> do
             iterM processCmdShallow f
@@ -504,6 +534,7 @@ cmdRunParserA mTopLevel inputInitial cmdParser
               prevStack :: CmdDescStack <- mGet
               return $ postProcessCmd prevStack c
             mSet $ rest
+            mSet $ PastCommandInput rest
             mSet $ (emptyCommandDesc :: CommandDesc out)
               { _cmd_mParent = Just (cmdStr, cmd)
               }
