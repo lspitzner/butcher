@@ -922,17 +922,23 @@ descFixParents = descFixParentsWithTopM Nothing
 -- descFixParentsWithTop s = descFixParentsWithTopM (Just (s, emptyCommandDesc))
 
 descFixParentsWithTopM :: Maybe (String, CommandDesc a) -> CommandDesc a -> CommandDesc a
-descFixParentsWithTopM mTop topDesc =
-    go $ case mTop of
-      Nothing  -> topDesc
-      Just top -> topDesc { _cmd_mParent = Just top }
+descFixParentsWithTopM mTop topDesc = Data.Function.fix $ \fixed -> topDesc
+        { _cmd_mParent  = goUp fixed <$> (mTop <|> _cmd_mParent topDesc)
+        , _cmd_children = _cmd_children topDesc <&> goDown fixed
+        }
   where
-    go :: CommandDesc a -> CommandDesc a
-    go desc =
-      let fixedDesc = desc { _cmd_children = _cmd_children desc <&> \(n, sd) ->
-                               (n, go $ sd { _cmd_mParent = Just (n, fixedDesc)})
-                           }
-      in fixedDesc
+    goUp :: CommandDesc a -> (String, CommandDesc a) -> (String, CommandDesc a)
+    goUp child (childName, parent) = (,) childName $ Data.Function.fix $ \fixed -> parent
+      { _cmd_mParent = goUp fixed <$> _cmd_mParent parent
+      , _cmd_children = _cmd_children parent <&> \(n, c) -> if n==childName
+          then (n, child)
+          else (n, c)
+      }
+    goDown :: CommandDesc a -> (String, CommandDesc a) -> (String, CommandDesc a)
+    goDown parent (childName, child) = (,) childName $ Data.Function.fix $ \fixed -> child
+      { _cmd_mParent = Just (childName, parent)
+      , _cmd_children = _cmd_children child <&> goDown fixed
+      }
 
 
 _tooLongText :: Int -- max length
