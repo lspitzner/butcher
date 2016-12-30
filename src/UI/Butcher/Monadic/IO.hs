@@ -19,6 +19,7 @@ import           Data.HList.ContainsType
 import           UI.Butcher.Monadic.Types
 import           UI.Butcher.Monadic.Core
 import           UI.Butcher.Monadic.Pretty
+import           UI.Butcher.Monadic.Param
 
 import           System.IO
 
@@ -57,8 +58,16 @@ mainFromCmdParser cmd = do
 addHelpCommand :: Applicative f => CmdParser f (IO ()) ()
 addHelpCommand = addCmd "help" $ do
   desc <- peekCmdDesc
+  rest <- addRestOfInputStringParam "SUBCOMMAND(s)" mempty
   addCmdImpl $ do
-    print $ ppHelpShallow $ maybe undefined snd (_cmd_mParent desc)
+    let parentDesc = maybe undefined snd (_cmd_mParent desc)
+    let restWords = List.words rest
+    let descent :: [String] -> CommandDesc a -> CommandDesc a
+        descent [] curDesc = curDesc
+        descent (w:wr) curDesc = case List.lookup w $ _cmd_children curDesc of
+          Nothing    -> curDesc
+          Just child -> descent wr child
+    print $ ppHelpShallow $ descent restWords parentDesc
 
 addButcherDebugCommand :: Applicative f => CmdParser f (IO ()) ()
 addButcherDebugCommand = addCmd "butcherdebug" $ do
