@@ -22,6 +22,7 @@ module UI.Butcher.Monadic.Types
   , PartDesc(..)
   , Input (..)
   , ParsingError (..)
+  , addSuggestion
   )
 where
 
@@ -109,12 +110,17 @@ data PartDesc
   | PartSeq [PartDesc]
   | PartDefault String -- default representation
                 PartDesc
+  | PartSuggestion [String] PartDesc
   | PartRedirect String -- name for the redirection
                  PartDesc
   | PartReorder [PartDesc]
   | PartMany PartDesc
   | PartWithHelp PP.Doc PartDesc
   deriving Show
+
+addSuggestion :: Maybe [String] -> PartDesc -> PartDesc
+addSuggestion Nothing     = id
+addSuggestion (Just sugs) = PartSuggestion sugs
 
 {-
 command documentation structure

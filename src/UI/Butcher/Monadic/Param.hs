@@ -3,10 +3,12 @@ module UI.Butcher.Monadic.Param
   , paramHelp
   , paramHelpStr
   , paramDefault
+  , paramSuggestions
   , addReadParam
   , addReadParamOpt
   , addStringParam
   , addStringParamOpt
+  , addRestOfInputStringParam
   )
 where
 
@@ -29,11 +31,17 @@ import           UI.Butcher.Monadic.Core
 data Param p = Param
   { _param_default :: Maybe p
   , _param_help :: Maybe PP.Doc
+  , _param_suggestions :: Maybe [p]
   }
 
 instance Monoid (Param p) where
-  mempty = Param Nothing Nothing
-  Param a1 b1 `mappend` Param a2 b2 = Param (a1 `f` a2) (b1 `mappend` b2)
+  mempty = Param Nothing Nothing Nothing
+  mappend (Param a1 b1 c1)
+          (Param a2 b2 c2)
+    = Param
+          (a1 `f` a2)
+          (b1 `mappend` b2)
+          (c1 `mappend` c2)
     where
       f Nothing x = x
       f x       _ = x
@@ -46,6 +54,9 @@ paramHelp h = mempty { _param_help = Just h }
 
 paramDefault :: p -> Param p
 paramDefault d = mempty { _param_default = Just d }
+
+paramSuggestions :: [p] -> Param p
+paramSuggestions ss = mempty { _param_suggestions = Just ss }
 
 addReadParam :: forall f out a
               . (Applicative f, Typeable a, Show a, Text.Read.Read a)
@@ -89,7 +100,7 @@ addStringParam
 addStringParam name par = addCmdPartInp desc parseF
   where
     desc :: PartDesc
-    desc = PartOptional
+    desc = addSuggestion (_param_suggestions par)
          $ (maybe id PartWithHelp $ _param_help par)
          $ PartVariable name
     parseF :: Input -> Maybe (String, Input)

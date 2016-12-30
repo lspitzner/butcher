@@ -107,6 +107,7 @@ ppHelpShallow desc@(CommandDesc mParent syn help parts _out _children) =
           PartAlts ps -> ps >>= go
           PartSeq  ps -> ps >>= go
           PartDefault _ p -> go p
+          PartSuggestion _ p -> go p
           PartRedirect s p -> [PP.text s $$ PP.nest 20 (ppPartDescUsage p)]
                            ++ (PP.nest 2 <$> go p)
           PartReorder ps -> ps >>= go
@@ -116,34 +117,41 @@ ppHelpShallow desc@(CommandDesc mParent syn help parts _out _children) =
 
 ppPartDescUsage :: PartDesc -> PP.Doc
 ppPartDescUsage = \case
-    PartLiteral s    -> PP.text s
-    PartVariable s   -> PP.text s
-    PartOptional p   -> PP.brackets $ rec p
-    PartAlts ps      -> PP.fcat $ PP.punctuate (PP.text ",") $ rec <$> ps
-    PartSeq ps       -> PP.fsep $ rec <$> ps
-    PartDefault _ p  -> PP.brackets $ rec p
-    PartRedirect s _ -> PP.text s
-    PartMany p       -> rec p <> PP.text "+"
-    PartWithHelp _ p -> rec p
-    PartReorder ps   ->
-      let flags = [d | PartMany d <- ps]
-          params = filter (\case PartMany{} -> False; _ -> True) ps
-      in     PP.brackets (PP.fsep $ rec <$> flags)
-         <+> PP.fsep (rec <$> params)
-  where
-    rec = ppPartDescUsage
+  PartLiteral  s  -> PP.text s
+  PartVariable s  -> PP.text s
+  PartOptional p  -> PP.brackets $ rec p
+  PartAlts     ps -> PP.fcat $ PP.punctuate (PP.text ",") $ rec <$> ps
+  PartSeq      ps -> PP.fsep $ rec <$> ps
+  PartDefault _ p -> PP.brackets $ rec p
+  PartSuggestion s p ->
+    PP.parens $ PP.fcat $ PP.punctuate (PP.text "|") $ fmap PP.text s ++ [rec p]
+  PartRedirect s _ -> PP.text s
+  PartMany p       -> rec p <> PP.text "+"
+  PartWithHelp _ p -> rec p
+  PartReorder ps ->
+    let flags  = [ d | PartMany d <- ps ]
+        params = filter ( \case
+                          PartMany{} -> False
+                          _          -> True
+                        )
+                        ps
+    in  PP.brackets (PP.fsep $ rec <$> flags) <+> PP.fsep (rec <$> params)
+ where
+  rec = ppPartDescUsage
 
 ppPartDescHeader :: PartDesc -> PP.Doc
 ppPartDescHeader = \case
-    PartLiteral    s -> PP.text s
-    PartVariable   s -> PP.text s
-    PartOptional ds' -> rec ds'
-    PartAlts alts    -> PP.hcat $ List.intersperse (PP.text ",") $ rec <$> alts
-    PartDefault  _ d -> rec d
-    PartRedirect s _ -> PP.text s
-    PartMany      ds -> rec ds
-    PartWithHelp _ d -> rec d
-    PartSeq       ds -> PP.hsep $ rec <$> ds
-    PartReorder   ds -> PP.vcat $ rec <$> ds
-  where
-    rec = ppPartDescHeader
+  PartLiteral  s     -> PP.text s
+  PartVariable s     -> PP.text s
+  PartOptional ds'   -> rec ds'
+  PartAlts     alts  -> PP.hcat $ List.intersperse (PP.text ",") $ rec <$> alts
+  PartDefault    _ d -> rec d
+  PartSuggestion _ d -> rec d
+  PartRedirect   s _ -> PP.text s
+  PartMany ds        -> rec ds
+  PartWithHelp _ d   -> rec d
+  PartSeq     ds     -> PP.hsep $ rec <$> ds
+  PartReorder ds     -> PP.vcat $ rec <$> ds
+ where
+  rec = ppPartDescHeader
+

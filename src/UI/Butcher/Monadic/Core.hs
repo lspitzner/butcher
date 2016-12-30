@@ -876,6 +876,7 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
       PartAlts alts    -> f $ head alts -- this is not optimal, but probably
                                      -- does not matter.
       PartDefault  _ d -> f d
+      PartSuggestion _ d -> f d
       PartRedirect s _ -> s
       PartMany      ds -> f ds
       PartWithHelp _ d -> f d
