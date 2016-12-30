@@ -222,7 +222,7 @@ addFlagStringParam shorts longs name flag = addCmdPartInpA desc parseF (\_ -> pu
         [drop (length s + 1) str | (s ++ " ") `isPrefixOf` str]
       of
         Nothing -> _flag_default flag <&> \x -> (x, InputString str)
-        Just rest1 -> let (x, rest2) = break (not . Char.isSpace) rest1
+        Just rest1 -> let (x, rest2) = break Char.isSpace $ dropWhile Char.isSpace rest1
                       in Just (x, InputString rest2)
     parseF (InputArgs (s1:s2:sr)) | any (==s1) allStrs = Just (s2, InputArgs sr)
     parseF inp@(InputArgs _) = _flag_default flag <&> \x -> (x, inp)
@@ -274,7 +274,7 @@ addFlagStringParamsAll shorts longs name flag act = addCmdPartManyInpA desc pars
       $ \s -> [ (x, InputString rest2)
               | (s ++ " ") `isPrefixOf` str
               , let rest1 = drop (length s + 1) str
-              , let (x, rest2) = break (not . Char.isSpace) rest1
+              , let (x, rest2) = break Char.isSpace $ dropWhile Char.isSpace rest1
               ]
     parseF (InputArgs (s1:s2:sr))
       = flip firstJust allStrs

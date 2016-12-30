@@ -105,7 +105,7 @@ addStringParam name par = addCmdPartInp desc parseF
          $ PartVariable name
     parseF :: Input -> Maybe (String, Input)
     parseF (InputString str)
-      = case break (not . Char.isSpace) str of
+      = case break Char.isSpace $ dropWhile Char.isSpace str of
           ("", rest) -> _param_default par <&> \x -> (x, InputString rest)
           (x, rest) -> Just (x, InputString rest)
     parseF (InputArgs args) = case args of
@@ -125,7 +125,7 @@ addStringParamOpt name par = addCmdPartInp desc parseF
          $ PartVariable name
     parseF :: Input -> Maybe (Maybe String, Input)
     parseF (InputString str)
-      = case break (not . Char.isSpace) str of
+      = case break Char.isSpace $ dropWhile Char.isSpace str of
           ("", rest) -> Just (Nothing, InputString rest)
           (x, rest) -> Just (Just x, InputString rest)
     parseF (InputArgs args) = case args of
