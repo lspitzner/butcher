@@ -16,6 +16,7 @@ module UI.Butcher.Monadic.Pretty
   , ppHelpShallow
   , ppPartDescUsage
   , ppPartDescHeader
+  , ppUsageWithHelp
   )
 where
 
@@ -47,10 +48,30 @@ ppUsage (CommandDesc mParent _help _syn parts out children) =
     partDocs = parts <&> ppPartDescUsage
     subsDoc = case out of
       _ | null children -> PP.empty -- TODO: remove debug
-      Nothing           -> PP.parens   $ subDoc
-      Just{}            -> PP.brackets $ subDoc
+      Nothing | null parts ->               subDoc
+              | otherwise  -> PP.parens   $ subDoc
+      Just{}               -> PP.brackets $ subDoc
     subDoc = PP.fcat $ PP.punctuate (PP.text " | ") $ children <&> \(n, _) ->
       PP.text n
+
+ppUsageWithHelp :: CommandDesc a -> PP.Doc
+ppUsageWithHelp (CommandDesc mParent help _syn parts out children) =
+    pparents mParent <+> PP.fsep (partDocs ++ [subsDoc]) PP.<> helpDoc
+  where
+    pparents :: Maybe (String, CommandDesc out) -> PP.Doc
+    pparents Nothing = PP.empty
+    pparents (Just (n, cd)) = pparents (_cmd_mParent cd) <+> PP.text n
+    partDocs = parts <&> ppPartDescUsage
+    subsDoc = case out of
+      _ | null children -> PP.empty -- TODO: remove debug
+      Nothing | null parts ->               subDoc
+              | otherwise  -> PP.parens   $ subDoc
+      Just{}               -> PP.brackets $ subDoc
+    subDoc = PP.fcat $ PP.punctuate (PP.text " | ") $ children <&> \(n, _) ->
+      PP.text n
+    helpDoc = case help of
+      Nothing -> PP.empty
+      Just h  -> PP.text ":" PP.<+> h
 
 ppUsageAt :: [String] -- (sub)command sequence
           -> CommandDesc a
