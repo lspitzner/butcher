@@ -1,16 +1,12 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE MonadComprehensions #-}
-{-# LANGUAGE MultiWayIf #-}
 
-module UI.Butcher.Monadic.Core
+module UI.Butcher.Monadic.Internal.Core
   ( addCmdSynopsis
   , addCmdHelp
   , addCmdHelpStr
@@ -27,11 +23,11 @@ module UI.Butcher.Monadic.Core
   , addCmdImpl
   , reorderStart
   , reorderStop
-  , cmdCheckParser
-  , cmdRunParser
-  , cmdRunParserExt
-  , cmdRunParserA
-  , cmdRunParserAExt
+  , checkCmdParser
+  , runCmdParser
+  , runCmdParserExt
+  , runCmdParserA
+  , runCmdParserAExt
   )
 where
 
@@ -52,7 +48,7 @@ import           Data.HList.ContainsType
 
 import           Data.Dynamic
 
-import           UI.Butcher.Monadic.Types
+import           UI.Butcher.Monadic.Internal.Types
 
 
 
@@ -91,15 +87,33 @@ l %=+ f = mModify (l %~ f)
 -- instance IsHelpBuilder FlagBuilder where
 --   help s = liftF $ FlagBuilderHelp s ()
 
+-- | Add a synopsis to the command currently in scope; at top level this will
+-- be the implicit top-level command.
+--
+-- Adding a second synopsis will overwrite a previous synopsis;
+-- 'checkCmdParser' will check that you don't (accidentally) do this however.
 addCmdSynopsis :: String -> CmdParser f out ()
 addCmdSynopsis s = liftF $ CmdParserSynopsis s ()
 
+-- | Add a help document to the command currently in scope; at top level this
+-- will be the implicit top-level command.
+--
+-- Adding a second document will overwrite a previous document;
+-- 'checkCmdParser' will check that you don't (accidentally) do this however.
 addCmdHelp :: PP.Doc -> CmdParser f out ()
 addCmdHelp s = liftF $ CmdParserHelp s ()
 
+-- | Like @'addCmdHelp' . PP.text@
 addCmdHelpStr :: String -> CmdParser f out ()
 addCmdHelpStr s = liftF $ CmdParserHelp (PP.text s) ()
 
+-- | Semi-hacky way of accessing the output CommandDesc from inside of a
+-- 'CmdParser'. This is not implemented via knot-tying, i.e. the CommandDesc
+-- you get is _not_ equivalent to the CommandDesc returned by 'runCmdParser'.
+--
+-- For best results, use this "below"
+-- any 'addCmd' invocations in the current context, e.g. directly before
+-- the 'addCmdImpl' invocation.
 peekCmdDesc :: CmdParser f out (CommandDesc out)
 peekCmdDesc = liftF $ CmdParserPeekDesc id
 
@@ -120,18 +134,20 @@ addCmdPartA p f a = liftF $ CmdParserPart p f a id
 
 addCmdPartMany
   :: (Applicative f, Typeable p)
-  => PartDesc
+  => ManyUpperBound
+  -> PartDesc
   -> (String -> Maybe (p, String))
   -> CmdParser f out [p]
-addCmdPartMany p f = liftF $ CmdParserPartMany p f (\_ -> pure ()) id
+addCmdPartMany b p f = liftF $ CmdParserPartMany b p f (\_ -> pure ()) id
 
 addCmdPartManyA
   :: (Typeable p)
-  => PartDesc
+  => ManyUpperBound
+  -> PartDesc
   -> (String -> Maybe (p, String))
   -> (p -> f ())
   -> CmdParser f out [p]
-addCmdPartManyA p f a = liftF $ CmdParserPartMany p f a id
+addCmdPartManyA b p f a = liftF $ CmdParserPartMany b p f a id
 
 addCmdPartInp
   :: (Applicative f, Typeable p)
@@ -150,32 +166,54 @@ addCmdPartInpA p f a = liftF $ CmdParserPartInp p f a id
 
 addCmdPartManyInp
   :: (Applicative f, Typeable p)
-  => PartDesc
+  => ManyUpperBound
+  -> PartDesc
   -> (Input -> Maybe (p, Input))
   -> CmdParser f out [p]
-addCmdPartManyInp p f = liftF $ CmdParserPartManyInp p f (\_ -> pure ()) id
+addCmdPartManyInp b p f = liftF $ CmdParserPartManyInp b p f (\_ -> pure ()) id
 
 addCmdPartManyInpA
   :: (Typeable p)
-  => PartDesc
+  => ManyUpperBound
+  -> PartDesc
   -> (Input -> Maybe (p, Input))
   -> (p -> f ())
   -> CmdParser f out [p]
-addCmdPartManyInpA p f a = liftF $ CmdParserPartManyInp p f a id
+addCmdPartManyInpA b p f a = liftF $ CmdParserPartManyInp b p f a id
 
+-- | Add a new child command in the current context.
 addCmd
   :: Applicative f
-  => String
-  -> CmdParser f out ()
+  => String -- ^ command name
+  -> CmdParser f out () -- ^ subcommand
   -> CmdParser f out ()
 addCmd str sub = liftF $ CmdParserChild str sub (pure ()) ()
 
+-- | Add an implementation to the current command.
 addCmdImpl :: out -> CmdParser f out ()
 addCmdImpl o = liftF $ CmdParserImpl o ()
 
+-- | Best explained via example:
+--
+-- > do
+-- >   reorderStart
+-- >   bright <- addSimpleBoolFlag "" ["bright"] mempty
+-- >   yellow <- addSimpleBoolFlag "" ["yellow"] mempty
+-- >   reorderStop
+-- >   ..
+--
+-- will accept any inputs "" "--bright" "--yellow" "--bright --yellow" "--yellow --bright".
+--
+-- This works for any flags/params, but bear in mind that the results might
+-- be unexpected because params may match on any input.
+--
+-- Note that start/stop must occur in pairs, and it will be a runtime error
+-- if you mess this up. Use 'checkCmdParser' if you want to check all parts
+-- of your 'CmdParser' without providing inputs that provide 100% coverage.
 reorderStart :: CmdParser f out ()
 reorderStart = liftF $ CmdParserReorderStart ()
 
+-- | See 'reorderStart'
 reorderStop :: CmdParser f out ()
 reorderStop = liftF $ CmdParserReorderStop ()
 
@@ -209,11 +247,19 @@ descStackAdd d = \case
   StackLayer l s u -> StackLayer (d:l) s u
 
 
-cmdCheckParser :: forall f out
-                . Maybe String -- top-level command name
-               -> CmdParser f out ()
+-- | Because butcher is evil (i.e. has constraints not encoded in the types;
+-- see the README), this method can be used as a rough check that you did not
+-- mess up. It traverses all possible parts of the 'CmdParser' thereby
+-- ensuring that the 'CmdParser' has a valid structure.
+--
+-- This method also yields a _complete_ @CommandDesc@ output, where the other
+-- runCmdParser* functions all traverse only a shallow structure around the
+-- parts of the 'CmdParser' touched while parsing the current input.
+checkCmdParser :: forall f out
+                . Maybe String -- ^ top-level command name
+               -> CmdParser f out () -- ^ parser to check
                -> Either String (CommandDesc ())
-cmdCheckParser mTopLevel cmdParser
+checkCmdParser mTopLevel cmdParser
     = (>>= final)
     $ MultiRWSS.runMultiRWSTNil
     $ MultiRWSS.withMultiStateAS (StackBottom [])
@@ -255,15 +301,15 @@ cmdCheckParser mTopLevel cmdParser
           descStack <- mGet
           mSet $ descStackAdd desc descStack
         processMain $ nextF monadMisuseError
-      Free (CmdParserPartMany desc _parseF _act nextF) -> do
+      Free (CmdParserPartMany bound desc _parseF _act nextF) -> do
         do
           descStack <- mGet
-          mSet $ descStackAdd (PartMany desc) descStack
+          mSet $ descStackAdd (wrapBoundDesc bound desc) descStack
         processMain $ nextF monadMisuseError
-      Free (CmdParserPartManyInp desc _parseF _act nextF) -> do
+      Free (CmdParserPartManyInp bound desc _parseF _act nextF) -> do
         do
           descStack <- mGet
-          mSet $ descStackAdd (PartMany desc) descStack
+          mSet $ descStackAdd (wrapBoundDesc bound desc) descStack
         processMain $ nextF monadMisuseError
       Free (CmdParserChild cmdStr sub _act next) -> do
         cmd :: CommandDesc out <- mGet
@@ -320,46 +366,60 @@ cmdCheckParser mTopLevel cmdParser
     monadMisuseError :: a
     monadMisuseError = error "CmdParser definition error - used Monad powers where only Applicative/Arrow is allowed"
 
-
 newtype PastCommandInput = PastCommandInput Input
 
 
-cmdRunParser
-  :: Maybe String
-  -> Input
-  -> CmdParser Identity out ()
+-- | Run a @CmdParser@ on the given input, returning:
+--
+-- a) A @CommandDesc ()@ that accurately represents the subcommand that was
+--    reached, even if parsing failed. Because this is returned always, the
+--    argument is @()@ because "out" requires a successful parse.
+--
+-- b) Either an error or the result of a successful parse, including a proper
+--    "CommandDesc out" from which an "out" can be extracted (presuming that
+--    the command has an implementation).
+runCmdParser
+  :: Maybe String -- ^ program name to be used for the top-level @CommandDesc@
+  -> Input -- ^ input to be processed
+  -> CmdParser Identity out () -- ^ parser to use
   -> (CommandDesc (), Either ParsingError (CommandDesc out))
-cmdRunParser mTopLevel inputInitial cmdParser
+runCmdParser mTopLevel inputInitial cmdParser
   = runIdentity
-  $ cmdRunParserA mTopLevel inputInitial cmdParser
+  $ runCmdParserA mTopLevel inputInitial cmdParser
 
-cmdRunParserExt
-  :: Maybe String
-  -> Input
-  -> CmdParser Identity out ()
+-- | Like 'runCmdParser', but also returning all input after the last
+-- successfully parsed subcommand. E.g. for some input
+-- "myprog foo bar -v --wrong" where parsing fails at "--wrong", this will
+-- contain the full "-v --wrong". Useful for interactive feedback stuff.
+runCmdParserExt
+  :: Maybe String -- ^ program name to be used for the top-level @CommandDesc@
+  -> Input -- ^ input to be processed
+  -> CmdParser Identity out () -- ^ parser to use
   -> (CommandDesc (), Input, Either ParsingError (CommandDesc out))
-cmdRunParserExt mTopLevel inputInitial cmdParser
+runCmdParserExt mTopLevel inputInitial cmdParser
   = runIdentity
-  $ cmdRunParserAExt mTopLevel inputInitial cmdParser
+  $ runCmdParserAExt mTopLevel inputInitial cmdParser
 
-cmdRunParserA :: forall f out
+-- | The Applicative-enabled version of 'runCmdParser'.
+runCmdParserA :: forall f out
                . Applicative f
-              => Maybe String
-              -> Input
-              -> CmdParser f out ()
+              => Maybe String -- ^ program name to be used for the top-level @CommandDesc@
+              -> Input -- ^ input to be processed
+              -> CmdParser f out () -- ^ parser to use
               -> f ( CommandDesc ()
                    , Either ParsingError (CommandDesc out)
                    )
-cmdRunParserA mTopLevel inputInitial cmdParser =
-  (\(x, _, z) -> (x, z)) <$> cmdRunParserAExt mTopLevel inputInitial cmdParser
+runCmdParserA mTopLevel inputInitial cmdParser =
+  (\(x, _, z) -> (x, z)) <$> runCmdParserAExt mTopLevel inputInitial cmdParser
 
-cmdRunParserAExt
+-- | The Applicative-enabled version of 'runCmdParserExt'.
+runCmdParserAExt
   :: forall f out . Applicative f
-  => Maybe String
-  -> Input
-  -> CmdParser f out ()
+  => Maybe String -- ^ program name to be used for the top-level @CommandDesc@
+  -> Input -- ^ input to be processed
+  -> CmdParser f out () -- ^ parser to use
   -> f (CommandDesc (), Input, Either ParsingError (CommandDesc out))
-cmdRunParserAExt mTopLevel inputInitial cmdParser
+runCmdParserAExt mTopLevel inputInitial cmdParser
     = runIdentity
     $ MultiRWSS.runMultiRWSTNil
     $ (<&> captureFinal)
@@ -461,10 +521,10 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
           Nothing -> do
             mTell ["could not parse " ++ getPartSeqDescPositionName desc]
             processMain $ nextF monadMisuseError
-      Free (CmdParserPartMany desc parseF actF nextF) -> do
+      Free (CmdParserPartMany bound desc parseF actF nextF) -> do
         do
           descStack <- mGet
-          mSet $ descStackAdd desc descStack
+          mSet $ descStackAdd (wrapBoundDesc bound desc) descStack
         let proc = do
               dropSpaces
               input <- mGet
@@ -485,10 +545,10 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
         r <- proc
         let act = traverse actF r
         (act *>) <$> processMain (nextF $ r)
-      Free (CmdParserPartManyInp desc parseF actF nextF) -> do
+      Free (CmdParserPartManyInp bound desc parseF actF nextF) -> do
         do
           descStack <- mGet
-          mSet $ descStackAdd desc descStack
+          mSet $ descStackAdd (wrapBoundDesc bound desc) descStack
         let proc = do
               dropSpaces
               input <- mGet
@@ -625,6 +685,7 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
       => CmdParserF f out (m ())
       -> m ()
     reorderPartGather = \case
+      -- TODO: why do PartGatherData contain desc?
       CmdParserPart desc parseF actF nextF -> do
         pid <- mGet
         mSet $ pid + 1
@@ -635,12 +696,12 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
         mSet $ pid + 1
         mTell [PartGatherData pid desc (Right parseF) actF False]
         nextF $ monadMisuseError
-      CmdParserPartMany desc parseF actF nextF -> do
+      CmdParserPartMany _ desc parseF actF nextF -> do
         pid <- mGet
         mSet $ pid + 1
         mTell [PartGatherData pid desc (Left parseF) actF True]
         nextF $ monadMisuseError
-      CmdParserPartManyInp desc parseF actF nextF -> do
+      CmdParserPartManyInp _ desc parseF actF nextF -> do
         pid <- mGet
         mSet $ pid + 1
         mTell [PartGatherData pid desc (Right parseF) actF True]
@@ -678,8 +739,8 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
     processParsedParts = \case
       Free (CmdParserPart    desc _ _ (nextF :: p -> CmdParser f out a)) -> part desc nextF
       Free (CmdParserPartInp desc _ _ (nextF :: p -> CmdParser f out a)) -> part desc nextF
-      Free (CmdParserPartMany    desc _ _ nextF) -> partMany desc nextF
-      Free (CmdParserPartManyInp desc _ _ nextF) -> partMany desc nextF
+      Free (CmdParserPartMany bound desc _ _ nextF) -> partMany bound desc nextF
+      Free (CmdParserPartManyInp bound desc _ _ nextF) -> partMany bound desc nextF
       Free (CmdParserReorderStop next) -> do
         stackCur <- mGet
         case stackCur of
@@ -751,13 +812,14 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
             Just _ -> monadMisuseError
         partMany
           :: Typeable p
-          => PartDesc
+          => ManyUpperBound
+          -> PartDesc
           -> ([p] -> CmdParser f out a)
           -> m (CmdParser f out a)
-        partMany desc nextF = do
+        partMany bound desc nextF = do
           do
             stackCur <- mGet
-            mSet $ descStackAdd (PartMany desc) stackCur
+            mSet $ descStackAdd (wrapBoundDesc bound desc) stackCur
           pid <- mGet
           mSet $ pid + 1
           m :: PartParsedData <- mGet
@@ -797,15 +859,15 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
           stackCur <- mGet
           mSet $ descStackAdd desc stackCur
         nextF monadMisuseError
-      CmdParserPartMany desc _parseF _act nextF -> do
+      CmdParserPartMany bound desc _parseF _act nextF -> do
         do
           stackCur <- mGet
-          mSet $ descStackAdd (PartMany desc) stackCur
+          mSet $ descStackAdd (wrapBoundDesc bound desc) stackCur
         nextF monadMisuseError
-      CmdParserPartManyInp desc _parseF _act nextF -> do
+      CmdParserPartManyInp bound desc _parseF _act nextF -> do
         do
           stackCur <- mGet
-          mSet $ descStackAdd (PartMany desc) stackCur
+          mSet $ descStackAdd (wrapBoundDesc bound desc) stackCur
         nextF monadMisuseError
       CmdParserChild cmdStr _sub _act next -> do
         cmd_children %=+ ((cmdStr, emptyCommandDesc :: CommandDesc out):)
@@ -900,7 +962,7 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
 --     err = "command is missing implementation!"
 --  
 -- cmdAction :: CmdParser out () -> String -> Either String out
--- cmdAction b s = case cmdRunParser Nothing s b of
+-- cmdAction b s = case runCmdParser Nothing s b of
 --   (_, Right cmd)                     -> cmdActionPartial cmd
 --   (_, Left (ParsingError (out:_) _)) -> Left $ out
 --   _ -> error "whoops"
@@ -909,11 +971,16 @@ cmdRunParserAExt mTopLevel inputInitial cmdParser
 --              -> CmdParser out ()
 --              -> String
 --              -> out
--- cmdActionRun f p s = case cmdRunParser Nothing s p of
+-- cmdActionRun f p s = case runCmdParser Nothing s p of
 --   (cmd, Right out) -> case _cmd_out out of
 --     Just o -> o
 --     Nothing -> f cmd (ParsingError ["command is missing implementation!"] "")
 --   (cmd, Left err) -> f cmd err
+
+wrapBoundDesc :: ManyUpperBound -> PartDesc -> PartDesc
+wrapBoundDesc ManyUpperBound1 = PartOptional
+wrapBoundDesc ManyUpperBoundN = PartMany
+
 
 descFixParents :: CommandDesc a -> CommandDesc a
 descFixParents = descFixParentsWithTopM Nothing

@@ -28,63 +28,6 @@ import qualified System.Time.Extra
 
 import qualified Data.Either.Combinators
 
--- import qualified Control.Lens
-
--- import qualified Control.Monad.Error.Lens
--- import qualified Control.Parallel.Strategies.Lens
--- import qualified Control.Seq.Lens
--- import qualified Data.Array.Lens
--- import qualified Data.Bits.Lens
--- import qualified Data.ByteString.Lazy.Lens
--- import qualified Data.ByteString.Lens
--- import qualified Data.ByteString.Strict.Lens
--- import qualified Data.Complex.Lens
--- import qualified Data.Data.Lens
--- import qualified Data.Dynamic.Lens
--- import qualified Data.HashSet.Lens
--- import qualified Data.IntSet.Lens
--- import qualified Data.List.Lens
--- import qualified Data.Map.Lens
--- import qualified Data.Sequence.Lens
--- import qualified Data.Set.Lens
--- import qualified Data.Text.Lazy.Lens
--- import qualified Data.Text.Lens
--- import qualified Data.Text.Strict.Lens
--- import qualified Data.Tree.Lens
--- import qualified Data.Typeable.Lens
--- import qualified Data.Vector.Generic.Lens
--- import qualified Data.Vector.Lens
--- import qualified GHC.Generics.Lens
--- import qualified Generics.Deriving.Lens
--- import qualified Language.Haskell.TH.Lens
--- import qualified Numeric.Lens
--- import qualified System.Exit.Lens
--- import qualified System.FilePath.Lens
--- import qualified System.IO.Error.Lens
-
--- import qualified Control.Monad.Cont
--- import qualified Control.Monad.Cont.Class
--- import qualified Control.Monad.Error.Class
--- import qualified Control.Monad.Except
--- import qualified Control.Monad.Identity
--- import qualified Control.Monad.List
--- import qualified Control.Monad.RWS
--- import qualified Control.Monad.RWS.Class
--- import qualified Control.Monad.RWS.Lazy
--- import qualified Control.Monad.RWS.Strict
--- import qualified Control.Monad.Reader
--- import qualified Control.Monad.Reader.Class
--- import qualified Control.Monad.State
--- import qualified Control.Monad.State.Class
--- import qualified Control.Monad.State.Lazy
--- import qualified Control.Monad.State.Strict
--- import qualified Control.Monad.Trans
--- import qualified Control.Monad.Writer
--- import qualified Control.Monad.Writer.Class
--- import qualified Control.Monad.Writer.Lazy
--- import qualified Control.Monad.Writer.Strict
-
--- import qualified Control.Monad.Trans.MultiRWS
 import qualified Control.Monad.Trans.MultiRWS.Lazy
 import qualified Control.Monad.Trans.MultiRWS.Strict
 import qualified Control.Monad.Trans.MultiReader
@@ -103,52 +46,6 @@ import qualified Control.Monad.Trans.MultiWriter.Strict
 import qualified Control.Monad.Trans.MultiRWS.Strict as MultiRWSS
 import qualified Control.Monad.Trans.MultiRWS.Lazy as MultiRWSL
 
--- import qualified Control.Applicative.Backwards
--- import qualified Control.Applicative.Lift
--- import qualified Control.Monad.IO.Class
--- import qualified Control.Monad.Signatures
--- import qualified Control.Monad.Trans.Class
--- import qualified Control.Monad.Trans.Cont
--- import qualified Control.Monad.Trans.Except
--- import qualified Control.Monad.Trans.Identity
--- import qualified Control.Monad.Trans.List
--- import qualified Control.Monad.Trans.Maybe
--- import qualified Control.Monad.Trans.RWS
--- import qualified Control.Monad.Trans.RWS.Lazy
--- import qualified Control.Monad.Trans.RWS.Strict
--- import qualified Control.Monad.Trans.Reader
--- import qualified Control.Monad.Trans.State
--- import qualified Control.Monad.Trans.State.Lazy
--- import qualified Control.Monad.Trans.State.Strict
--- import qualified Control.Monad.Trans.Writer
--- import qualified Control.Monad.Trans.Writer.Lazy
--- import qualified Control.Monad.Trans.Writer.Strict
--- import qualified Data.Functor.Classes
--- import qualified Data.Functor.Compose
--- import qualified Data.Functor.Constant
--- import qualified Data.Functor.Product
--- import qualified Data.Functor.Reverse
--- import qualified Data.Functor.Sum
-
--- import qualified Prelude
--- import qualified Control.Applicative
--- import qualified Control.Arrow
--- import qualified Control.Category
--- import qualified Control.Concurrent
--- import qualified Control.Concurrent.Chan
--- import qualified Control.Concurrent.MVar
--- import qualified Control.Concurrent.QSem
--- import qualified Control.Concurrent.QSemN
--- import qualified Control.Exception
--- import qualified Control.Exception.Base
--- import qualified Control.Monad
--- import qualified Control.Monad.Fix
--- import qualified Control.Monad.ST
--- import qualified Control.Monad.ST.Lazy
--- import qualified Control.Monad.ST.Lazy.Unsafe
--- import qualified Control.Monad.ST.Strict
--- import qualified Control.Monad.ST.Unsafe
--- import qualified Control.Monad.Zip
 import qualified Data.Bifunctor
 import qualified Data.Bits
 import qualified Data.Bool
@@ -172,90 +69,18 @@ import qualified Data.Maybe
 import qualified Data.Monoid
 import qualified Data.Ord
 import qualified Data.Proxy
--- import qualified Data.Ratio
--- import qualified Data.STRef
--- import qualified Data.STRef.Lazy
--- import qualified Data.STRef.Strict
--- import qualified Data.String
--- import qualified Data.Traversable
--- import qualified Data.Tuple
--- import qualified Data.Type.Bool
--- import qualified Data.Type.Coercion
--- import qualified Data.Type.Equality
--- import qualified Data.Typeable
--- import qualified Data.Typeable.Internal
--- import qualified Data.Unique
--- import qualified Data.Version
--- import qualified Data.Void
--- import qualified Data.Word
 import qualified Debug.Trace
--- import qualified Foreign.C
--- import qualified Foreign.C.Error
--- import qualified Foreign.C.String
--- import qualified Foreign.C.Types
--- import qualified Foreign.Concurrent
--- import qualified Foreign.ForeignPtr
--- import qualified Foreign.ForeignPtr.Unsafe
--- import qualified Foreign.Marshal
--- import qualified Foreign.Marshal.Alloc
--- import qualified Foreign.Marshal.Array
--- import qualified Foreign.Marshal.Error
--- import qualified Foreign.Marshal.Pool
--- import qualified Foreign.Marshal.Unsafe
--- import qualified Foreign.Marshal.Utils
--- import qualified Foreign.Ptr
--- import qualified Foreign.StablePtr
--- import qualified Foreign.Storable
 import qualified Numeric
 import qualified Numeric.Natural
--- import qualified System.CPUTime
--- import qualified System.Console.GetOpt
 import qualified System.Environment
--- import qualified System.Exit
 import qualified System.IO
--- import qualified System.IO.Error
--- import qualified System.IO.Unsafe
--- import qualified System.Info
--- import qualified System.Mem
--- import qualified System.Mem.StableName
--- import qualified System.Mem.Weak
--- import qualified System.Posix.Types
--- import qualified System.Timeout
--- import qualified Text.ParserCombinators.ReadP
--- import qualified Text.ParserCombinators.ReadPrec
--- import qualified Text.Printf
 import qualified Text.Read
--- import qualified Text.Read.Lex
 import qualified Text.Show
--- import qualified Text.Show.Functions
 import qualified Unsafe.Coerce
 
--- import qualified Control.Arrow as Arrow
--- import qualified Control.Category as Category
--- import qualified Control.Concurrent as Concurrent
--- import qualified Control.Concurrent.Chan as Chan
--- import qualified Control.Concurrent.MVar as MVar
--- import qualified Control.Exception as Exception
--- import qualified Control.Exception.Base as Exception.Base
--- import qualified Control.Monad as Monad
--- import qualified Data.Bits as Bits
 import qualified Data.Bool as Bool
 import qualified Data.Char as Char
--- import qualified Data.Complex as Complex
--- import qualified Data.Either as Either
--- import qualified Data.Eq as Eq
--- import qualified Data.Foldable as Foldable
--- import qualified Data.Fixed as Fixed
--- import qualified Data.Functor.Identity as Identity
--- import qualified Data.IORef as IORef
--- import qualified Data.Int as Int
--- import qualified Data.Ix as Ix
 import qualified Data.Maybe as Maybe
--- import qualified Data.Monoid as Monoid
--- import qualified Data.Ord as Ord
--- import qualified Data.Proxy as Proxy
--- import qualified Data.Traversable as Traversable
--- import qualified Data.Void as Void
 import qualified Control.Monad.Trans.Writer.Strict as WriterS
 
 #if MIN_VERSION_base(4,9,0)
@@ -264,15 +89,9 @@ import qualified GHC.OldList as List
 import qualified Data.List as List
 #endif
 
--- import qualified Text.Printf as Printf
-
 import qualified Data.IntMap as IntMap
--- import qualified Data.IntMap.Lazy as IntMapL
 import qualified Data.IntMap.Strict as IntMapS
--- import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
--- import qualified Data.Map.Lazy as MapL
--- import qualified Data.Map.Strict as MapS
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 
@@ -281,18 +100,9 @@ import qualified Control.Monad.Reader.Class as Reader.Class
 import qualified Control.Monad.State.Class as State.Class
 import qualified Control.Monad.Writer.Class as Writer.Class
 
--- import qualified Control.Monad.Trans.Class as Trans.Class
--- import qualified Control.Monad.Trans.Maybe as Trans.Maybe
--- import qualified Control.Monad.Trans.RWS as RWS
--- import qualified Control.Monad.Trans.RWS.Lazy as RWSL
--- import qualified Control.Monad.Trans.RWS.Strict as RWSS
--- import qualified Control.Monad.Trans.Reader as Reader
 import qualified Control.Monad.Trans.State as State
 import qualified Control.Monad.Trans.State.Lazy as StateL
 import qualified Control.Monad.Trans.State.Strict as StateS
--- import qualified Control.Monad.Trans.Writer as Writer
--- import qualified Control.Monad.Trans.Writer.Lazy as WriterL
--- import qualified Control.Monad.Trans.Writer.Strict as Writer
 
 import Data.Functor.Identity ( Identity(..) )
 import Control.Concurrent.Chan ( Chan )
@@ -571,57 +381,9 @@ import Control.Monad.Extra                ( whenM
 import Data.Tree                          ( Tree(..)
                                           )
 
-import Control.Monad.Trans.MultiRWS       ( -- MultiRWST (..)
-                                          -- , MultiRWSTNull
-                                          -- , MultiRWS
-                                          -- , 
-                                            MonadMultiReader(..)
+import Control.Monad.Trans.MultiRWS       ( MonadMultiReader(..)
                                           , MonadMultiWriter(..)
                                           , MonadMultiState(..)
-                                          -- , runMultiRWST
-                                          -- , runMultiRWSTASW
-                                          -- , runMultiRWSTW
-                                          -- , runMultiRWSTAW
-                                          -- , runMultiRWSTSW
-                                          -- , runMultiRWSTNil
-                                          -- , runMultiRWSTNil_
-                                          -- , withMultiReader
-                                          -- , withMultiReader_
-                                          -- , withMultiReaders
-                                          -- , withMultiReaders_
-                                          -- , withMultiWriter
-                                          -- , withMultiWriterAW
-                                          -- , withMultiWriterWA
-                                          -- , withMultiWriterW
-                                          -- , withMultiWriters
-                                          -- , withMultiWritersAW
-                                          -- , withMultiWritersWA
-                                          -- , withMultiWritersW
-                                          -- , withMultiState
-                                          -- , withMultiStateAS
-                                          -- , withMultiStateSA
-                                          -- , withMultiStateA
-                                          -- , withMultiStateS
-                                          -- , withMultiState_
-                                          -- , withMultiStates
-                                          -- , withMultiStatesAS
-                                          -- , withMultiStatesSA
-                                          -- , withMultiStatesA
-                                          -- , withMultiStatesS
-                                          -- , withMultiStates_
-                                          -- , inflateReader
-                                          -- , inflateMultiReader
-                                          -- , inflateWriter
-                                          -- , inflateMultiWriter
-                                          -- , inflateState
-                                          -- , inflateMultiState
-                                          -- , mapMultiRWST
-                                          -- , mGetRawR
-                                          -- , mGetRawW
-                                          -- , mGetRawS
-                                          -- , mPutRawR
-                                          -- , mPutRawW
-                                          -- , mPutRawS
                                           )
 
 import Control.Monad.Trans.MultiReader    ( runMultiReaderTNil

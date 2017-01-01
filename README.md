@@ -9,12 +9,12 @@ The main differences are:
 
 * Provides a pure interface by default
 
-* Has clearly defined semantics, see the section below.
-
 * Exposes an evil monadic interface, which allows for much nicer binding of
-  command part results to some variable name, where in `optparse-applicative`
-  you easily lose track of what field you are modifying after the 5th `<*>`
-  (admittedly, i think -XRecordWildCards improves on that issue already.)
+  command part results to some variable name.
+
+    In `optparse-applicative` you easily lose track of what field you are
+    modifying after the 5th `<*>` (admittedly, i think -XRecordWildCards
+    improves on that issue already.)
 
     Evil, because you are not allowed to use the monad's full power in this
     case, i.e. there is a constraint that is not statically enforced.
@@ -23,10 +23,52 @@ The main differences are:
 * The monadic interface allows much clearer definitions of commandparses
   with (nested) subcommands. No pesky sum-types are necessary.
 
-* Additionally, it is possible to wrap everything in _another_ applicative
-  (chosen by the user) and execute actions whenever specific parts are
-  parsed successfully. This provides a direct interface for more advanced
-  features, like `--no-foo` pendants to `--foo` flags.
+## Examples
+
+The minimal example is
+
+~~~~.hs
+main = mainFromCmdParser $ addCmdImpl $ putStrLn "Hello, World!"
+~~~~
+
+But lets look at a more feature-complete example:
+
+~~~~.hs
+main = mainFromCmdParserWithHelpDesc $ \helpDesc -> do
+
+  addCmdSynopsis "a simple butcher example program"
+  addCmdHelpStr "a very long help document"
+
+  addCmd "version" $ do
+    porcelain <- addSimpleBoolFlag "" ["porcelain"]
+      (flagHelpStr "print nothing but the numeric version")
+    addCmdHelpStr "prints the version of this program"
+    addCmdImpl $ putStrLn $ if porcelain
+      then "0.0.0.999"
+      else "example, version 0.0.0.999"
+
+  addCmd "help" $ addCmdImpl $ print $ ppHelpShallow helpDesc
+
+  short <- addSimpleBoolFlag "" ["short"]
+    (flagHelpStr "make the greeting short")
+  name <- addStringParam "NAME"
+    (paramHelpStr "your name, so you can be greeted properly")
+
+  addCmdImpl $ do
+    if short
+      then putStrLn $ "hi, " ++ name ++ "!"
+      else putStrLn $ "hello, " ++ name ++ ", welcome from butcher!"
+~~~~
+
+Further:
+
+- [Full description of the above example, including sample behaviour](example1.md)
+- [Example of a pure usage of a CmdParser](example2.md)
+- [Example of using a CmdParser on interactive input](example3.md)
+- The [brittany](https://github.com/lspitzner/brittany) formatting tool is a
+  program that uses butcher for implementing its commandline interface. See
+  its [main module source](https://github.com/lspitzner/brittany/blob/master/src-brittany/Main.hs)
+  or [the config flag parser](https://github.com/lspitzner/brittany/blob/master/src/Language/Haskell/Brittany/Config.hs).
 
 ## The evil monadic interface
 
@@ -60,8 +102,8 @@ when f $ do
 ~~~~
 
 That means that checking if a combination of flags is allowed must be done
-after parsing. (But different commands and their subcommands have separate
-sets of flags.)
+after parsing. (But different commands and their subcommands (can) have
+separate sets of flags.)
 
 ## (abstract) Package intentions
 

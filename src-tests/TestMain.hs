@@ -9,6 +9,7 @@ import Test.Hspec
 -- import NeatInterpolation
 
 import UI.Butcher.Monadic
+import UI.Butcher.Monadic.Types
 
 
 
@@ -29,7 +30,7 @@ checkTests = do
 
 simpleParseTest :: Spec
 simpleParseTest = do
-  it "failed parse 001" $ cmdRunParser Nothing (InputString "foo") testCmd1
+  it "failed parse 001" $ runCmdParser Nothing (InputString "foo") testCmd1
          `shouldSatisfy` Data.Either.Combinators.isLeft . snd
   it "toplevel" $ (testParse testCmd1 "" >>= _cmd_out)
                   `shouldSatisfy` Maybe.isNothing
@@ -112,14 +113,14 @@ testCmd3 = do
 testParse :: CmdParser Identity out () -> String -> Maybe (CommandDesc out)
 testParse cmd s = either (const Nothing) Just
                 $ snd
-                $ cmdRunParser Nothing (InputString s) cmd
+                $ runCmdParser Nothing (InputString s) cmd
 
 testRun :: CmdParser Identity (WriterS.Writer (Sum Int) ()) () -> String -> Either ParsingError (Maybe Int)
 testRun cmd s = fmap (fmap (getSum . WriterS.execWriter) . _cmd_out)
               $ snd
-              $ cmdRunParser Nothing (InputString s) cmd
+              $ runCmdParser Nothing (InputString s) cmd
 
 testRunA :: CmdParser (StateS.State Int) () () -> String -> Either ParsingError Int
 testRunA cmd str = (\((_, e), s) -> e $> s)
                  $ flip StateS.runState (0::Int)
-                 $ cmdRunParserA Nothing (InputString str) cmd
+                 $ runCmdParserA Nothing (InputString str) cmd
