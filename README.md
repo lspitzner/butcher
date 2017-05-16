@@ -120,8 +120,6 @@ for the user. More specifically, i had three goals in mind:
 
 ## Semantics
 
-(Sorry, this description is severely lacking, I know.)
-
 Basic elements of a command are flags, parameters and subcommands. These can
 be composed in certain ways, i.e. flags can have a (or possibly multiple?)
 parameters; parameters can be grouped into sequences, and commands can have
@@ -137,3 +135,107 @@ fail with `Nothing`.
 
 A command-parser contains a sequence of parts and then a number of subcommands
 and/or some implementation. 
+
+### Commands and Child-Commands
+
+- ~~~~ .hs
+  myParser :: CmdParser Identity Int ()
+  myParser = return ()
+  ~~~~
+
+  input | `runCmdParserSimple input myParser`
+  ----- | -------------
+  "" | Left "command has no implementation"
+  "x" | Left "error parsing arguments: could not parse input/unprocessed input at: \"x\"."
+
+- ~~~~ .hs
+  myParser :: CmdParser Identity Int ()
+  myParser = do
+    addCmd "foo" $ addCmdImpl 2
+    addCmd "bar" $ addCmdImpl 3
+    addCmd "noimpl" $ pure ()
+    addCmd "twoimpls" $ do
+      addCmdImpl 4
+      addCmdImpl 5
+    addCmdImpl 1
+  ~~~~
+  
+  input | `runCmdParserSimple input myParser`
+  ----- | -------------
+  "" | Right 1
+  "x" | Left "error parsing arguments: could not parse input/unprocessed input at: \"x\"."
+  "foo" | Right 2
+  "bar" | Right 3
+  "foo bar" | Left "error parsing arguments: could not parse input/unprocessed input at: \"bar\"."
+  "noimpl" | Left "command has no implementation"
+  "twoimpls" | Right 5
+
+### Flags
+
+- without any annotation, no reodering is allowed and the flags must appear in order:
+  ~~~~ .hs
+  myParser :: CmdParser Identity (Bool, Int, Int) ()
+  myParser = do
+    b <- addSimpleBoolFlag "b" [] mempty
+    c <- addSimpleCountFlag "c" [] mempty
+    i <- addFlagReadParam "i" [] "number" (flagDefault 42)
+    addCmdImpl $ (b, c, i)
+  ~~~~
+  
+  input | `runCmdParserSimple input myParser`
+  ----- | -------------
+  "" | Right (False,0,42)
+  "-b -c -i 3" | Right (True,1,3)
+  "-c -b" | Left "error parsing arguments: could not parse input/unprocessed input at: \"-b\"."
+  "-c -c -c" | Right (False,3,42)
+
+- this time with reordering; also "j" has no default and thus becomes mandatory, still it must not
+  occur more than once:
+  ~~~~ .hs
+  myParser :: CmdParser Identity (Bool, Int, Int, Int) ()
+  myParser = do
+    reorderStart -- this time with reordering
+    b <- addSimpleBoolFlag "b" [] mempty
+    c <- addSimpleCountFlag "c" [] mempty
+    i <- addFlagReadParam "i" [] "number" (flagDefault 42)
+    j <- addFlagReadParam "j" [] "number" mempty -- no default: flag mandatory
+    reorderStop
+    addCmdImpl $ (b, c, i, j)
+  ~~~~
+  
+  input | `runCmdParserSimple input myParser`
+  ---------------------------- | -------------
+  "-b" | Left "error parsing arguments:<br>could not parse expected input -j number with remaining input:<br>InputString \"\" at the end of input."
+  "-j=5" | Right (False,0,42,5)
+  "-c -b -b -j=5" | Right (True,1,42,5)
+  "-j=5 -i=1 -c -b" | Right (True,1,1,5)
+  "-c -j=5 -c -i=5 -c" | Right (False,3,5,5)
+  "-j=5 -j=5" | Left "error parsing arguments: could not parse input/unprocessed input at: \"-j=5\"."
+
+- addFlagReadParams - these can occur more than once. Note that defaults have slightly different semantics:
+  ~~~~ .hs
+  myParser :: CmdParser Identity (Int, [Int]) ()
+  myParser = do
+    reorderStart
+    i <- addFlagReadParam "i" [] "number" (flagDefault 42)
+    js <- addFlagReadParams "j" [] "number" (flagDefault 50)
+    reorderStop
+    addCmdImpl $ (i, js)
+  ~~~~
+  
+  input | `runCmdParserSimple input myParser`
+  ---------------------------- | -------------
+  "" | Right (42,[])
+  "-i" | Left "error parsing arguments: could not parse input/unprocessed input at: \"-i\"."
+  "-j=1 -j=2 -j=3" | Right (42,[1,2,3])
+  "-j" | Right (42,[50])
+  "-i=1" | Right (1,[])
+  "-j=2" | Right (42,[2])
+  "-j=2 -i=1 -j=3" | Right (1,[2,3])
+  
+### Params
+
+TODO
+
+
+
