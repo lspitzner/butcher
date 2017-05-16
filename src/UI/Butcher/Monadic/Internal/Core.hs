@@ -880,8 +880,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
                     ++ show input
                     ]
                 failureCurrentShallowRerun
-                return $ return $ monadMisuseError -- so ugly.
-                     -- should be correct nonetheless.
+                processParsedParts $ nextF monadMisuseError
               continueOrMisuse :: Maybe p -> m (CmdParser f out a)
               continueOrMisuse = maybe monadMisuseError
                                        (processParsedParts . nextF)
@@ -916,7 +915,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
           mSet $ MapS.delete pid m
           let partDyns = case MapS.lookup pid m of
                 Nothing -> []
-                Just r -> r
+                Just r -> reverse r
           case mapM fromDynamic partDyns of
             Nothing -> monadMisuseError
             Just xs -> processParsedParts $ nextF xs
