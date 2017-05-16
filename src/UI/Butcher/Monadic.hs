@@ -83,7 +83,7 @@ runCmdParserWithHelpDesc mProgName input cmdF =
 -- any error case.
 runCmdParserSimple :: String -> CmdParser Identity out () -> Either String out
 runCmdParserSimple s p = case snd $ runCmdParser Nothing (InputString s) p of
-  Left e -> Left $ show e
+  Left e -> Left $ parsingErrorString e
   Right desc ->
     maybe (Left "command has no implementation") Right $ _cmd_out desc
 

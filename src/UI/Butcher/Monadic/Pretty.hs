@@ -33,6 +33,7 @@ module UI.Butcher.Monadic.Pretty
   , ppUsageWithHelp
   , ppPartDescUsage
   , ppPartDescHeader
+  , parsingErrorString
   )
 where
 
@@ -232,4 +233,22 @@ ppPartDescHeader = \case
   PartReorder ds     -> PP.vcat $ rec <$> ds
  where
   rec = ppPartDescHeader
+
+-- | Simple conversion from 'ParsingError' to 'String'.
+parsingErrorString :: ParsingError -> String
+parsingErrorString (ParsingError mess remaining) =
+  "error parsing arguments: " ++ messStr ++ remainingStr
+ where
+  messStr      = case mess of
+    []    -> ""
+    (m:_) -> m ++ " "
+  remainingStr = case remaining of
+    InputString ""  -> "at the end of input."
+    InputString str -> case show str of
+      s | length s < 42 -> "at: " ++ s ++ "."
+      s                 -> "at: " ++ take 40 s ++ "..\"."
+    InputArgs   []  -> "at the end of input"
+    InputArgs   xs  -> case List.unwords $ show <$> xs of
+      s | length s < 42 -> "at: " ++ s ++ "."
+      s                 -> "at: " ++ take 40 s ++ "..\"."
 
