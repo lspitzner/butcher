@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | Flags are arguments to your current command that are prefixed with "-" or
 -- "--", for example "-v" or "--verbose". These flags can have zero or one
@@ -40,6 +41,32 @@ import           UI.Butcher.Monadic.Internal.Types
 import           UI.Butcher.Monadic.Internal.Core
 
 import           Data.List.Extra ( firstJust )
+
+
+
+-- TODO: perhaps move this to Types module and refactor all code to use it
+newtype InpParseString a = InpParseString (StateS.StateT String Maybe a)
+  deriving (Functor, Applicative, Monad, State.Class.MonadState String, Alternative, MonadPlus)
+
+runInpParseString :: String -> InpParseString a -> Maybe (a, String)
+runInpParseString s (InpParseString m) = StateS.runStateT m s
+
+pExpect :: String -> InpParseString ()
+pExpect s = InpParseString $ do
+  inp <- StateS.get
+  case List.stripPrefix s inp of
+    Nothing -> mzero
+    Just rest -> StateS.put rest
+
+pExpectEof :: InpParseString ()
+pExpectEof =
+  InpParseString $ StateS.get >>= \inp -> if null inp then pure () else mzero
+
+-- pDropSpace :: InpParseString ()
+-- pDropSpace = InpParseString $ StateS.modify (dropWhile (==' '))
+
+pOption :: InpParseString () -> InpParseString ()
+pOption m = m <|> return ()
 
 
 
@@ -142,30 +169,49 @@ addFlagReadParam
   -> String -- ^ param name
   -> Flag p -- ^ properties
   -> CmdParser f out p
-addFlagReadParam shorts longs name flag = addCmdPartInpA desc parseF (\_ -> pure ())
-  where
-    allStrs = fmap (\c -> "-"++[c]) shorts
-           ++ fmap (\s -> "--"++s)  longs
-    desc = (maybe id PartWithHelp $ _flag_help flag)
-         $ maybe id (PartDefault . show) (_flag_default flag)
-         $ PartSeq [desc1, desc2]
-    desc1 :: PartDesc
-    desc1 = PartAlts $ PartLiteral <$> allStrs
-    desc2 = PartVariable name
-    parseF :: Input -> Maybe (p, Input)
-    parseF inp = case inp of
-      InputString str -> case flip firstJust allStrs $ \s ->
-          [drop (length s + 1) str | (s ++ " ") `isPrefixOf` str]
-        of
-          Nothing -> _flag_default flag <&> \x -> (x, InputString str)
-          Just rest -> case Text.Read.reads rest of
-            ((x, ' ':r):_) -> Just (x, InputString $ dropWhile Char.isSpace r)
-            ((x, ""):_)    -> Just (x, InputString $ "")
-            _ -> Nothing
-      InputArgs (arg1:argR) | any (==arg1) allStrs -> case argR of
-        [] -> Nothing
+addFlagReadParam shorts longs name flag = addCmdPartInpA desc
+                                                         parseF
+                                                         (\_ -> pure ())
+ where
+  allStrs =
+    [ Left $ "-" ++ [c] | c <- shorts ] ++ [ Right $ "--" ++ l | l <- longs ]
+  desc =
+    (maybe id PartWithHelp $ _flag_help flag)
+      $ maybe id (PartDefault . show) (_flag_default flag)
+      $ PartSeq [desc1, desc2]
+  desc1 :: PartDesc
+  desc1 = PartAlts $ PartLiteral . either id id <$> allStrs
+  desc2 = PartVariable name
+  parseF :: Input -> Maybe (p, Input)
+  parseF inp = case inp of
+    InputString str ->
+      maybe (_flag_default flag <&> \x -> (x, inp)) (Just . second InputString)
+        $ parseResult
+     where
+      parseResult = runInpParseString str $ do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect " " <|> pExpect "=")
+          Right s -> pExpect s *> (pExpect " " <|> pExpect "=")
+        InpParseString $ do
+          i <- StateS.get
+          case Text.Read.reads i of
+            ((x, ' ':r):_) -> StateS.put (dropWhile Char.isSpace r) $> x
+            ((x, ""   ):_) -> StateS.put "" $> x
+            _              -> mzero
+    InputArgs (arg1:argR) -> case runInpParseString arg1 parser of
+      Just ((), "") -> case argR of
+        []          -> Nothing
         (arg2:rest) -> readMaybe arg2 <&> \x -> (x, InputArgs rest)
-      InputArgs _ -> _flag_default flag <&> \d -> (d, inp)
+      Just ((), remainingStr) ->
+        readMaybe remainingStr <&> \x -> (x, InputArgs argR)
+      Nothing -> _flag_default flag <&> \d -> (d, inp)
+     where
+      parser :: InpParseString ()
+      parser = do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect "=")
+          Right s -> pExpect s *> (pExpect "=" <|> pExpectEof)
+    InputArgs _ -> _flag_default flag <&> \d -> (d, inp)
 
 -- | One-argument flag, where the argument is parsed via its Read instance.
 -- This version can accumulate multiple values by using the same flag with
@@ -199,71 +245,100 @@ addFlagReadParams shorts longs name flag
 --   = void $ addFlagReadParamsAll shorts longs name flag act
 
 addFlagReadParamsAll
-  :: forall f p out
-   . (Typeable p, Text.Read.Read p, Show p)
-  => String -- ^ short flag chars, i.e. "v" for -v
-  -> [String] -- ^ list of long names, i.e. ["verbose"]
-  -> String -- ^ param name
-  -> Flag p -- ^ properties
-  -> (p -> f ()) -- ^ action to execute when ths param matches
-  -> CmdParser f out [p]
-addFlagReadParamsAll shorts longs name flag act =
-  addCmdPartManyInpA ManyUpperBoundN desc parseF act
-  where
-    allStrs = fmap (\c -> "-"++[c]) shorts
-           ++ fmap (\s -> "--"++s)  longs
-    desc = (maybe id PartWithHelp $ _flag_help flag)
-         $ PartSeq [desc1, desc2]
-    desc1 :: PartDesc
-    desc1 = PartAlts $ PartLiteral <$> allStrs
-    desc2 = (maybe id (PartDefault . show) $ _flag_default flag)
-          $ PartVariable name
-    parseF :: Input -> Maybe (p, Input)
-    parseF inp = case inp of
-      InputString str -> flip firstJust allStrs $ \s ->
-        [ t
-        | (s ++ " ") `isPrefixOf` str
-        , let rest = drop (length s + 1) str
-        , t <- case Text.Read.reads rest of
-           ((x, ' ':r):_) -> Just (x, InputString $ dropWhile Char.isSpace r)
-           ((x, ""):_)    -> Just (x, InputString $ "")
-           _ -> _flag_default flag <&> \x -> (x, InputString rest)
-        ]
-      InputArgs (arg1:argR) | any (==arg1) allStrs -> case argR of
-        [] -> _flag_default flag <&> \d -> (d, InputArgs argR)
-        (arg2:rest) -> case readMaybe arg2 of
-          Just x -> Just (x, InputArgs rest)
-          Nothing -> _flag_default flag <&> \d -> (d, InputArgs argR)
-      InputArgs _ -> Nothing
-
+  :: forall f p out . (Typeable p, Text.Read.Read p, Show p) => String -- ^ short flag chars, i.e. "v" for -v
+     -> [String] -- ^ list of long names, i.e. ["verbose"]
+     -> String -- ^ param name
+     -> Flag p -- ^ properties
+     -> (p -> f ()) -- ^ action to execute when ths param matches
+     -> CmdParser f out [p]
+addFlagReadParamsAll shorts longs name flag act = addCmdPartManyInpA
+  ManyUpperBoundN
+  desc
+  parseF
+  act
+ where
+  allStrs =
+    [ Left $ "-" ++ [c] | c <- shorts ] ++ [ Right $ "--" ++ l | l <- longs ]
+  desc = (maybe id PartWithHelp $ _flag_help flag) $ PartSeq [desc1, desc2]
+  desc1 :: PartDesc
+  desc1 = PartAlts $ PartLiteral . either id id <$> allStrs
+  desc2 =
+    (maybe id (PartDefault . show) $ _flag_default flag) $ PartVariable name
+  parseF :: Input -> Maybe (p, Input)
+  parseF inp = case inp of
+    InputString str -> fmap (second InputString) $ parseResult
+     where
+      parseResult = runInpParseString str $ do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect " " <|> pExpect "=")
+          Right s -> pExpect s *> (pExpect " " <|> pExpect "=")
+        InpParseString $ do
+          i <- StateS.get
+          case Text.Read.reads i of
+            ((x, ' ':r):_) -> StateS.put (dropWhile Char.isSpace r) $> x
+            ((x, ""   ):_) -> StateS.put "" $> x
+            _              -> lift $ _flag_default flag
+    InputArgs (arg1:argR) -> case runInpParseString arg1 parser of
+      Just ((), "") -> case argR of
+        []          -> mdef
+        (arg2:rest) -> (readMaybe arg2 <&> \x -> (x, InputArgs rest)) <|> mdef
+        where mdef = _flag_default flag <&> \p -> (p, InputArgs argR)
+      Just ((), remainingStr) ->
+        readMaybe remainingStr <&> \x -> (x, InputArgs argR)
+      Nothing -> Nothing
+     where
+      parser :: InpParseString ()
+      parser = do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect "=")
+          Right s -> pExpect s *> (pExpect "=" <|> pExpectEof)
+    InputArgs _ -> Nothing
 
 -- | One-argument flag where the argument can be an arbitrary string.
 addFlagStringParam
-  :: forall f out
-   . (Applicative f)
-  => String -- ^ short flag chars, i.e. "v" for -v
-  -> [String] -- ^ list of long names, i.e. ["verbose"]
-  -> String -- ^ param name
-  -> Flag String -- ^ properties
-  -> CmdParser f out String
-addFlagStringParam shorts longs name flag = addCmdPartInpA desc parseF (\_ -> pure ())
-  where
-    allStrs = fmap (\c -> "-"++[c]) shorts
-           ++ fmap (\s -> "--"++s)  longs
-    desc = (maybe id PartWithHelp $ _flag_help flag)
-         $ PartSeq [desc1, desc2]
-    desc1 :: PartDesc
-    desc1 = PartAlts $ PartLiteral <$> allStrs
-    desc2 = PartVariable name
-    parseF :: Input -> Maybe (String, Input)
-    parseF (InputString str) = case flip firstJust allStrs $ \s ->
-        [drop (length s + 1) str | (s ++ " ") `isPrefixOf` str]
-      of
-        Nothing -> _flag_default flag <&> \x -> (x, InputString str)
-        Just rest1 -> let (x, rest2) = break Char.isSpace $ dropWhile Char.isSpace rest1
-                      in Just (x, InputString rest2)
-    parseF (InputArgs (s1:s2:sr)) | any (==s1) allStrs = Just (s2, InputArgs sr)
-    parseF inp@(InputArgs _) = _flag_default flag <&> \x -> (x, inp)
+  :: forall f out . (Applicative f) => String -- ^ short flag chars, i.e. "v" for -v
+     -> [String] -- ^ list of long names, i.e. ["verbose"]
+     -> String -- ^ param name
+     -> Flag String -- ^ properties
+     -> CmdParser f out String
+addFlagStringParam shorts longs name flag = addCmdPartInpA desc
+                                                           parseF
+                                                           (\_ -> pure ())
+ where
+  allStrs =
+    [ Left $ "-" ++ [c] | c <- shorts ] ++ [ Right $ "--" ++ l | l <- longs ]
+  desc = (maybe id PartWithHelp $ _flag_help flag) $ PartSeq [desc1, desc2]
+  desc1 :: PartDesc
+  desc1 = PartAlts $ PartLiteral . either id id <$> allStrs
+  desc2 = PartVariable name
+  parseF :: Input -> Maybe (String, Input)
+  parseF inp = case inp of
+    InputString str ->
+      maybe (_flag_default flag <&> \x -> (x, inp)) (Just . second InputString)
+        $ parseResult
+     where
+      parseResult = runInpParseString str $ do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect " " <|> pExpect "=")
+          Right s -> pExpect s *> (pExpect " " <|> pExpect "=")
+        InpParseString $ do
+          i <- StateS.get
+          let (x, rest) = break Char.isSpace $ dropWhile Char.isSpace i
+          StateS.put rest
+          pure x
+    InputArgs (arg1:argR) -> case runInpParseString arg1 parser of
+      Just ((), ""          ) -> case argR of
+        []       -> Nothing
+        (x:rest) -> Just (x, InputArgs rest)
+      Just ((), remainingStr) -> Just (remainingStr, InputArgs argR)
+      Nothing                 -> _flag_default flag <&> \d -> (d, inp)
+     where
+      parser :: InpParseString ()
+      parser = do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect "=")
+          Right s -> pExpect s *> (pExpect "=" <|> pExpectEof)
+    InputArgs _ -> _flag_default flag <&> \d -> (d, inp)
 
 -- | One-argument flag where the argument can be an arbitrary string.
 -- This version can accumulate multiple values by using the same flag with
@@ -296,36 +371,49 @@ addFlagStringParams shorts longs name flag
 --   = void $ addFlagStringParamsAll shorts longs name flag act
 
 addFlagStringParamsAll
-  :: forall f out
-   . String
-  -> [String]
-  -> String
-  -> Flag Void -- we forbid the default because it has bad interaction
+  :: forall f out . String
+     -> [String]
+     -> String
+     -> Flag Void -- we forbid the default because it has bad interaction
                -- with the eat-anything behaviour of the string parser.
-  -> (String -> f ())
-  -> CmdParser f out [String]
-addFlagStringParamsAll shorts longs name flag act =
-  addCmdPartManyInpA ManyUpperBoundN desc parseF act
-  where
-    allStrs = fmap (\c -> "-"++[c]) shorts
-           ++ fmap (\s -> "--"++s)  longs
-    desc = (maybe id PartWithHelp $ _flag_help flag)
-         $ PartSeq [desc1, desc2]
-    desc1 :: PartDesc
-    desc1 = PartAlts $ PartLiteral <$> allStrs
-    desc2 = (maybe id (PartDefault . show) $ _flag_default flag)
-          $ PartVariable name
-    parseF :: Input -> Maybe (String, Input)
-    parseF (InputString str)
-      = flip firstJust allStrs
-      $ \s -> [ (x, InputString rest2)
-              | (s ++ " ") `isPrefixOf` str
-              , let rest1 = drop (length s + 1) str
-              , let (x, rest2) = break Char.isSpace $ dropWhile Char.isSpace rest1
-              ]
-    parseF (InputArgs (s1:s2:sr))
-      = flip firstJust allStrs
-      $ \s -> [ (s2, InputArgs sr)
-              | s == s1
-              ]
-    parseF (InputArgs _) = Nothing
+     -> (String -> f ())
+     -> CmdParser f out [String]
+addFlagStringParamsAll shorts longs name flag act = addCmdPartManyInpA
+  ManyUpperBoundN
+  desc
+  parseF
+  act
+ where
+  allStrs =
+    [ Left $ "-" ++ [c] | c <- shorts ] ++ [ Right $ "--" ++ l | l <- longs ]
+  desc = (maybe id PartWithHelp $ _flag_help flag) $ PartSeq [desc1, desc2]
+  desc1 :: PartDesc
+  desc1 = PartAlts $ PartLiteral . either id id <$> allStrs
+  desc2 =
+    (maybe id (PartDefault . show) $ _flag_default flag) $ PartVariable name
+  parseF :: Input -> Maybe (String, Input)
+  parseF inp = case inp of
+    InputString str -> fmap (second InputString) $ parseResult
+     where
+      parseResult = runInpParseString str $ do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect " " <|> pExpect "=")
+          Right s -> pExpect s *> (pExpect " " <|> pExpect "=")
+        InpParseString $ do
+          i <- StateS.get
+          let (x, rest) = break Char.isSpace $ dropWhile Char.isSpace i
+          StateS.put rest
+          pure x
+    InputArgs (arg1:argR) -> case runInpParseString arg1 parser of
+      Just ((), ""          ) -> case argR of
+        []       -> Nothing
+        (x:rest) -> Just (x, InputArgs rest)
+      Just ((), remainingStr) -> Just (remainingStr, InputArgs argR)
+      Nothing                 -> Nothing
+     where
+      parser :: InpParseString ()
+      parser = do
+        Data.Foldable.msum $ allStrs <&> \case
+          Left  s -> pExpect s *> pOption (pExpect "=")
+          Right s -> pExpect s *> (pExpect "=" <|> pExpectEof)
+    InputArgs _ -> Nothing

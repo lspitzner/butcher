@@ -94,6 +94,15 @@ simpleRunTest = do
         , ""
         , "  test a aa | ab"
         ]
+  describe "read flags" $ do
+    it "flag 1" $ testRun testCmd5 "abc" `shouldBe` Right (Just 10)
+    it "flag 2" $ testRun testCmd5 "abc -f 2" `shouldBe` Right (Just 2)
+    it "flag 3" $ testRun testCmd5 "abc --flag 3" `shouldBe` Right (Just 3)
+    it "flag 4" $ testRun testCmd5 "abc -f=4" `shouldBe` Right (Just 4)
+    it "flag 5" $ testRun testCmd5 "abc --flag=5" `shouldBe` Right (Just 5)
+    it "flag 6" $ testRun testCmd5 "abc -f" `shouldSatisfy` Data.Either.isLeft
+    it "flag 6" $ testRun testCmd5 "abc -flag 0" `shouldSatisfy` Data.Either.isLeft
+    it "flag 6" $ testRun testCmd5 "abc --f 0" `shouldSatisfy` Data.Either.isLeft
 
 
 
@@ -151,6 +160,13 @@ testCmd4 = do
   addCmd "b" $ do
     addCmd "ba" $ do
       addCmdImpl $ WriterS.tell 3
+
+testCmd5 :: CmdParser Identity (WriterS.Writer (Sum Int) ()) ()
+testCmd5 = do
+  addCmd "abc" $ do
+    x <- addFlagReadParam "f" ["flag"] "flag" (flagDefault (10::Int))
+    addCmdImpl $ WriterS.tell (Sum x)
+
 
 testParse :: CmdParser Identity out () -> String -> Maybe (CommandDesc out)
 testParse cmd s = either (const Nothing) Just
