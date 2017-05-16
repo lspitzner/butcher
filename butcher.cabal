@@ -1,5 +1,7 @@
 name:                butcher
 version:             1.1.0.0
+synopsis:            Chops a command or program invocation into digestable pieces.
+description:         See the README (it is properly formatted on github)
 license:             BSD3
 license-file:        LICENSE
 author:              Lennart Spitzner
@@ -7,21 +9,19 @@ maintainer:          lsp@informatik.uni-kiel.de
 copyright:           Copyright (C) 2016-2017 Lennart Spitzner
 category:            UI
 build-type:          Simple
-synopsis:            Chops a command or program invocation into digestable pieces.
-description:         See the README.
 Stability:           experimental
-
 extra-source-files: {
   ChangeLog.md
   srcinc/prelude.inc
   README.md
 }
-
 cabal-version:       >=1.10
+homepage:            https://github.com/lspitzner/butcher/
+bug-reports:         https://github.com/lspitzner/butcher/issues
 
 source-repository head {
   type: git
-  location: git@github.com:lspitzner/butcher.git
+  location: https://github.com/lspitzner/butcher.git
 }
 
 flag butcher-dev
