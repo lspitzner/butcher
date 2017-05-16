@@ -24,6 +24,7 @@ module UI.Butcher.Monadic.Internal.Core
   , addCmdImpl
   , reorderStart
   , reorderStop
+  , withReorder
   , checkCmdParser
   , runCmdParser
   , runCmdParserExt
@@ -244,6 +245,11 @@ reorderStart = liftF $ CmdParserReorderStart ()
 -- | See 'reorderStart'
 reorderStop :: CmdParser f out ()
 reorderStop = liftF $ CmdParserReorderStop ()
+
+-- | Safe wrapper around 'reorderStart'/'reorderStop' for cases where reducing
+-- to a single binding is possible/preferable.
+withReorder :: CmdParser f out a -> CmdParser f out a
+withReorder x = reorderStart *> x <* reorderStop
 
 -- addPartHelp :: String -> CmdPartParser ()
 -- addPartHelp s = liftF $ CmdPartParserHelp s ()

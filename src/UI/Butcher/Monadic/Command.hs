@@ -59,6 +59,7 @@ module UI.Butcher.Monadic.Command
   , addCmdHelpStr
   , reorderStart
   , reorderStop
+  , withReorder
   , peekCmdDesc
   , peekInput
     -- * Building CmdParsers - myprog -v --input PATH
