@@ -60,10 +60,16 @@ module UI.Butcher.Monadic.Command
   , reorderStart
   , reorderStop
   , peekCmdDesc
+  , peekInput
     -- * Building CmdParsers - myprog -v --input PATH
   , module  UI.Butcher.Monadic.Flag
     -- * Building CmdParsers - myprog SOME_INT
   , module  UI.Butcher.Monadic.Param
+    -- * Low-level part functions
+  , addCmdPart
+  , addCmdPartMany
+  , addCmdPartInp
+  , addCmdPartManyInp
   )
 where
 

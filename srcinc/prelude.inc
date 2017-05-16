@@ -91,7 +91,8 @@ import qualified Data.List as List
 
 import qualified Data.IntMap as IntMap
 import qualified Data.IntMap.Strict as IntMapS
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as MapS
+import qualified Data.Map.Lazy as MapL
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 
@@ -127,6 +128,10 @@ import Data.Sequence ( Seq )
 
 import Data.Map ( Map )
 import Data.Set ( Set )
+
+import Deque ( Deque )
+
+import qualified Deque
 
 import Prelude                            ( Char
                                           , String

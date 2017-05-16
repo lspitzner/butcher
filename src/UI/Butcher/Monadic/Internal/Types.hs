@@ -59,7 +59,8 @@ data ManyUpperBound
 data CmdParserF f out a
   =                          CmdParserHelp PP.Doc a
   |                          CmdParserSynopsis String a
-  |                          CmdParserPeekDesc (CommandDesc out -> a)
+  |                          CmdParserPeekDesc (CommandDesc () -> a)
+  |                          CmdParserPeekInput (String -> a)
   -- TODO: we can clean up this duplication by providing
   -- a function (String -> Maybe (p, String)) -> (Input -> Maybe (p, Input)).
   | forall p . Typeable p => CmdParserPart PartDesc (String -> Maybe (p, String)) (p -> f ()) (p -> a)
@@ -112,7 +113,9 @@ data CommandDesc out = CommandDesc
   , _cmd_help     :: Maybe PP.Doc
   , _cmd_parts    :: [PartDesc]
   , _cmd_out      :: Maybe out
-  , _cmd_children :: [(String, CommandDesc out)]
+  , _cmd_children :: Deque (String, CommandDesc out) -- we don't use a Map here
+                                                     -- because we'd like to
+                                                     -- retain the order.
   }
 
 -- type PartSeqDesc = [PartDesc]
@@ -164,7 +167,7 @@ deriving instance Functor CommandDesc
 --
 
 emptyCommandDesc :: CommandDesc out
-emptyCommandDesc = CommandDesc Nothing Nothing Nothing [] Nothing []
+emptyCommandDesc = CommandDesc Nothing Nothing Nothing [] Nothing mempty
 
 instance Show (CommandDesc out) where
   show c = "Command help=" ++ show (_cmd_help c)

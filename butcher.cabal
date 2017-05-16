@@ -49,6 +49,7 @@ library
     , nats
     , void
     , bifunctors
+    , deque
     }
   if flag(butcher-dev) {
     build-depends:
@@ -110,6 +111,7 @@ test-suite tests
     , transformers
     , mtl
     , extra
+    , deque
     }
   if flag(butcher-dev) {
     buildable:        True

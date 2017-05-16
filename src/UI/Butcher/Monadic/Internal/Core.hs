@@ -11,6 +11,7 @@ module UI.Butcher.Monadic.Internal.Core
   , addCmdHelp
   , addCmdHelpStr
   , peekCmdDesc
+  , peekInput
   , addCmdPart
   , addCmdPartA
   , addCmdPartMany
@@ -28,6 +29,7 @@ module UI.Butcher.Monadic.Internal.Core
   , runCmdParserExt
   , runCmdParserA
   , runCmdParserAExt
+  , mapOut
   )
 where
 
@@ -114,8 +116,11 @@ addCmdHelpStr s = liftF $ CmdParserHelp (PP.text s) ()
 -- For best results, use this "below"
 -- any 'addCmd' invocations in the current context, e.g. directly before
 -- the 'addCmdImpl' invocation.
-peekCmdDesc :: CmdParser f out (CommandDesc out)
+peekCmdDesc :: CmdParser f out (CommandDesc ())
 peekCmdDesc = liftF $ CmdParserPeekDesc id
+
+peekInput :: CmdParser f out String
+peekInput = liftF $ CmdParserPeekInput id
 
 addCmdPart
   :: (Applicative f, Typeable p)
@@ -236,15 +241,17 @@ data PartGatherData f
     , _pgd_many   :: Bool
     }
 
+data ChildGather f out = ChildGather String (CmdParser f out ()) (f ())
+
 type PartParsedData = Map Int [Dynamic]
 
-data CmdDescStack = StackBottom [PartDesc]
-                  | StackLayer  [PartDesc] String CmdDescStack
+data CmdDescStack = StackBottom (Deque PartDesc)
+                  | StackLayer  (Deque PartDesc) String CmdDescStack
 
 descStackAdd :: PartDesc -> CmdDescStack -> CmdDescStack
 descStackAdd d = \case
-  StackBottom l    -> StackBottom $ d:l
-  StackLayer l s u -> StackLayer (d:l) s u
+  StackBottom l    -> StackBottom $ Deque.snoc d l
+  StackLayer l s u -> StackLayer (Deque.snoc d l) s u
 
 
 -- | Because butcher is evil (i.e. has constraints not encoded in the types;
@@ -262,7 +269,7 @@ checkCmdParser :: forall f out
 checkCmdParser mTopLevel cmdParser
     = (>>= final)
     $ MultiRWSS.runMultiRWSTNil
-    $ MultiRWSS.withMultiStateAS (StackBottom [])
+    $ MultiRWSS.withMultiStateAS (StackBottom mempty)
     $ MultiRWSS.withMultiStateS emptyCommandDesc
     $ processMain cmdParser
   where
@@ -273,8 +280,7 @@ checkCmdParser mTopLevel cmdParser
         StackBottom descs -> Right
                            $ descFixParentsWithTopM (mTopLevel <&> \n -> (n, emptyCommandDesc))
                            $ () <$ desc
-          { _cmd_parts = reverse descs
-          , _cmd_children = reverse $ _cmd_children desc
+          { _cmd_parts = Data.Foldable.toList descs
           }
         StackLayer _ _ _ -> Left "unclosed ReorderStart or GroupStart"
     processMain :: CmdParser f out ()
@@ -290,6 +296,8 @@ checkCmdParser mTopLevel cmdParser
         mSet $ cmd { _cmd_synopsis = Just $ PP.text s }
         processMain next
       Free (CmdParserPeekDesc nextF) -> do
+        processMain $ nextF monadMisuseError
+      Free (CmdParserPeekInput nextF) -> do
         processMain $ nextF monadMisuseError
       Free (CmdParserPart desc _parseF _act nextF) -> do
         do
@@ -312,25 +320,23 @@ checkCmdParser mTopLevel cmdParser
           mSet $ descStackAdd (wrapBoundDesc bound desc) descStack
         processMain $ nextF monadMisuseError
       Free (CmdParserChild cmdStr sub _act next) -> do
+        mInitialDesc <- takeCommandChild cmdStr
         cmd :: CommandDesc out <- mGet
         subCmd <- do
           stackCur :: CmdDescStack <- mGet
-          mSet (emptyCommandDesc :: CommandDesc out)
-          mSet $ StackBottom []
+          mSet $ fromMaybe (emptyCommandDesc :: CommandDesc out) mInitialDesc
+          mSet $ StackBottom mempty
           processMain sub
           c <- mGet
           stackBelow <- mGet
           mSet cmd
           mSet stackCur
           subParts <- case stackBelow of
-            StackBottom descs -> return $ reverse descs
+            StackBottom descs -> return $ Data.Foldable.toList descs
             StackLayer _ _ _ -> lift $ Left "unclosed ReorderStart or GroupStart"
-          return c
-            { _cmd_children = reverse $ _cmd_children c
-            , _cmd_parts = subParts
-            }
+          return c { _cmd_parts = subParts }
         mSet $ cmd
-          { _cmd_children = (cmdStr, subCmd) : _cmd_children cmd
+          { _cmd_children = (cmdStr, subCmd) `Deque.snoc` _cmd_children cmd
           }
         processMain next
       Free (CmdParserImpl out next) -> do
@@ -338,7 +344,7 @@ checkCmdParser mTopLevel cmdParser
         processMain $ next
       Free (CmdParserGrouped groupName next) -> do
         stackCur <- mGet
-        mSet $ StackLayer [] groupName stackCur
+        mSet $ StackLayer mempty groupName stackCur
         processMain $ next
       Free (CmdParserGroupEnd next) -> do
         stackCur <- mGet
@@ -348,19 +354,19 @@ checkCmdParser mTopLevel cmdParser
           StackLayer _descs "" _up -> do
             lift $ Left $ "GroupEnd found, but expected ReorderStop first"
           StackLayer descs groupName up -> do
-            mSet $ descStackAdd (PartRedirect groupName (PartSeq (reverse descs))) up
+            mSet $ descStackAdd (PartRedirect groupName (PartSeq (Data.Foldable.toList descs))) up
             processMain $ next
       Free (CmdParserReorderStop next) -> do
         stackCur <- mGet
         case stackCur of
           StackBottom{} -> lift $ Left $ "ReorderStop without reorderStart"
           StackLayer descs "" up -> do
-            mSet $ descStackAdd (PartReorder (reverse descs)) up
+            mSet $ descStackAdd (PartReorder (Data.Foldable.toList descs)) up
           StackLayer{} -> lift $ Left $ "Found ReorderStop, but need GroupEnd first"
         processMain next
       Free (CmdParserReorderStart next) -> do
         stackCur <- mGet
-        mSet $ StackLayer [] "" stackCur
+        mSet $ StackLayer mempty "" stackCur
         processMain next
 
     monadMisuseError :: a
@@ -425,7 +431,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
     $ (<&> captureFinal)
     $ MultiRWSS.withMultiWriterWA
     $ MultiRWSS.withMultiStateA cmdParser
-    $ MultiRWSS.withMultiStateSA (StackBottom [])
+    $ MultiRWSS.withMultiStateSA (StackBottom mempty)
     $ MultiRWSS.withMultiStateSA inputInitial
     $ MultiRWSS.withMultiStateSA (PastCommandInput inputInitial)
     $ MultiRWSS.withMultiStateSA initialCommandDesc
@@ -480,9 +486,11 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
               $ MultiRWSS.runMultiRWSTNil
               $ MultiRWSS.withMultiStateSA emptyCommandDesc
                   { _cmd_mParent = _cmd_mParent cmdCur } -- partialDesc
-              $ MultiRWSS.withMultiStateS (StackBottom []) -- partialStack
+              $ MultiRWSS.withMultiStateS (StackBottom mempty) -- partialStack
               $ iterM processCmdShallow $ parser
-        processMain $ nextF $ postProcessCmd stack cmd
+        processMain $ nextF $ () <$ postProcessCmd stack cmd
+      Free (CmdParserPeekInput nextF) -> do
+        processMain $ nextF $ inputToString inputInitial
       Free (CmdParserPart desc parseF actF nextF) -> do
         do
           descStack <- mGet
@@ -561,53 +569,81 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
         r <- proc
         let act = traverse actF r
         (act *>) <$> processMain (nextF $ r)
-      f@(Free (CmdParserChild cmdStr sub act next)) -> do
+      f@(Free (CmdParserChild _ _ _ _)) -> do
         dropSpaces
         input <- mGet
+        (gatheredChildren :: [ChildGather f out], restCmdParser) <-
+          MultiRWSS.withMultiWriterWA $ childrenGather f
         let
-          mRest = case input of
-            InputString str | cmdStr == str ->
-              Just $ InputString ""
-            InputString str | (cmdStr++" ") `isPrefixOf` str ->
-              Just $ InputString $ drop (length cmdStr + 1) str
-            InputArgs (str:strr) | cmdStr == str ->
-              Just $ InputArgs strr
-            _ -> Nothing
+          child_fold
+            :: (Deque String, Map String (CmdParser f out (), f ()))
+            -> ChildGather f out
+            -> (Deque String, Map String (CmdParser f out (), f ()))
+          child_fold (c_names, c_map) (ChildGather name child act) =
+            case name `MapS.lookup` c_map of
+              Nothing ->
+                ( Deque.snoc name c_names
+                , MapS.insert name (child, act) c_map
+                )
+              Just (child', act') ->
+                ( c_names
+                , MapS.insert name (child' >> child, act') c_map
+                   -- we intentionally override/ignore act here.
+                   -- TODO: it should be documented that we expect the same act
+                   -- on different child nodes with the same name.
+                )
+          (child_name_list, child_map) =
+            foldl' child_fold (mempty, MapS.empty) gatheredChildren
+          combined_child_list = Data.Foldable.toList child_name_list <&> \n ->
+            (n, child_map MapS.! n)
+        let mRest = asum $ combined_child_list <&> \(name, (child, act)) ->
+              case input of
+                InputString str | name == str ->
+                  Just $ (name, child, act, InputString "")
+                InputString str | (name++" ") `isPrefixOf` str ->
+                  Just $ (name, child, act, InputString $ drop (length name + 1) str)
+                InputArgs (str:strr) | name == str ->
+                  Just $ (name, child, act, InputArgs strr)
+                _ -> Nothing
         case mRest of
-          Nothing -> do
-            cmd :: CommandDesc out <- mGet
-            let (subCmd, subStack)
-                  = runIdentity
-                  $ MultiRWSS.runMultiRWSTNil
-                  $ MultiRWSS.withMultiStateSA (emptyCommandDesc :: CommandDesc out)
-                  $ MultiRWSS.withMultiStateS (StackBottom [])
-                  $ iterM processCmdShallow sub
-            mSet $ cmd
-              { _cmd_children = (cmdStr, postProcessCmd subStack subCmd)
-                              : _cmd_children cmd
-              }
-            processMain next
-          Just rest -> do
+          Nothing -> do -- a child not matching what we have in the input
+            let initialDesc :: CommandDesc out = emptyCommandDesc
+            -- get the shallow desc for the child in a separate env.
+            combined_child_list `forM_` \(child_name, (child, _)) -> do
+              let (subCmd, subStack)
+                    = runIdentity
+                    $ MultiRWSS.runMultiRWSTNil
+                    $ MultiRWSS.withMultiStateSA initialDesc
+                    $ MultiRWSS.withMultiStateS (StackBottom mempty)
+                    $ iterM processCmdShallow child
+              cmd_children %=+ Deque.snoc (child_name, postProcessCmd subStack subCmd)
+            -- proceed regularly on the same layer
+            processMain $ restCmdParser
+          Just (name, child, act, rest) -> do -- matching child -> descend
+            -- process all remaining stuff on the same layer shallowly,
+            -- including the current node. This will be replaced later.
             iterM processCmdShallow f
+            -- so the descend
             cmd <- do
               c :: CommandDesc out <- mGet
               prevStack :: CmdDescStack <- mGet
               return $ postProcessCmd prevStack c
             mSet $ rest
             mSet $ PastCommandInput rest
-            mSet $ (emptyCommandDesc :: CommandDesc out)
-              { _cmd_mParent = Just (cmdStr, cmd)
+            mSet $ emptyCommandDesc
+              { _cmd_mParent = Just (name, cmd)
               }
-            mSet $ sub
-            mSet $ StackBottom []
-            subAct <- processMain sub
-            return $ act *> subAct
+            mSet $ child
+            mSet $ StackBottom mempty
+            childAct <- processMain child
+            -- check that descending yielded
+            return $ act *> childAct
       Free (CmdParserImpl out next) -> do
         cmd_out .=+ Just out
         processMain $ next
       Free (CmdParserGrouped groupName next) -> do
         stackCur <- mGet
-        mSet $ StackLayer [] groupName stackCur
+        mSet $ StackLayer mempty groupName stackCur
         processMain $ next
       Free (CmdParserGroupEnd next) -> do
         stackCur <- mGet
@@ -616,7 +652,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
             mTell $ ["butcher interface error: group end without group start"]
             return $ pure () -- hard abort should be fine for this case.
           StackLayer descs groupName up -> do
-            mSet $ descStackAdd (PartRedirect groupName (PartSeq (reverse descs))) up
+            mSet $ descStackAdd (PartRedirect groupName (PartSeq (Data.Foldable.toList descs))) up
             processMain $ next
       Free (CmdParserReorderStop next) -> do
         mTell $ ["butcher interface error: reorder stop without reorder start"]
@@ -627,7 +663,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
                   $ iterM reorderPartGather $ next
         let
           reorderMapInit :: Map Int (PartGatherData f)
-          reorderMapInit = Map.fromList $ reorderData <&> \d -> (_pgd_id d, d)
+          reorderMapInit = MapS.fromList $ reorderData <&> \d -> (_pgd_id d, d)
           tryParsePartData :: Input -> PartGatherData f -> First (Int, Dynamic, Input, Bool, f ())
           tryParsePartData input (PartGatherData pid _ pfe act allowMany) =
             First [ (pid, toDyn r, rest, allowMany, act r)
@@ -653,17 +689,17 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
               Nothing -> return $ pure ()
               Just (pid, x, rest, more, act) -> do
                 mSet rest
-                mModify $ Map.insertWith (++) pid [x]
+                mModify $ MapS.insertWith (++) pid [x]
                 when (not more) $ do
-                  mSet $ Map.delete pid m
+                  mSet $ MapS.delete pid m
                 actRest <- parseLoop
                 return $ act *> actRest
-        (finalMap, (fr, acts)) <- MultiRWSS.withMultiStateSA (Map.empty :: PartParsedData)
+        (finalMap, (fr, acts)) <- MultiRWSS.withMultiStateSA (MapS.empty :: PartParsedData)
                                 $ MultiRWSS.withMultiStateA reorderMapInit
                                 $ do
           acts <- parseLoop -- filling the map
           stackCur <- mGet
-          mSet $ StackLayer [] "" stackCur
+          mSet $ StackLayer mempty "" stackCur
           fr <- MultiRWSS.withMultiStateA (1::Int) $ processParsedParts next
           return (fr, acts)
         -- we check that all data placed in the map has been consumed while
@@ -671,7 +707,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
         -- there can only be any rest if the collection of parts changed
         -- between the reorderPartGather traversal and the processParsedParts
         -- consumption.
-        if Map.null finalMap
+        if MapS.null finalMap
           then do
             actRest <- processMain fr
             return $ acts *> actRest
@@ -711,6 +747,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
       CmdParserHelp{}         -> restCase
       CmdParserSynopsis{}     -> restCase
       CmdParserPeekDesc{}     -> restCase
+      CmdParserPeekInput{}    -> restCase
       CmdParserChild{}        -> restCase
       CmdParserImpl{}         -> restCase
       CmdParserReorderStart{} -> restCase
@@ -720,6 +757,36 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
         restCase = do
           mTell ["Did not find expected ReorderStop after the reordered parts"]
           return ()
+
+    childrenGather
+      :: ( MonadMultiWriter [ChildGather f out] m
+         , MonadMultiState (CmdParser f out ()) m
+         , MonadMultiState (CommandDesc out) m
+         )
+      => CmdParser f out a
+      -> m (CmdParser f out a)
+    childrenGather = \case
+      Free (CmdParserChild cmdStr sub act next) -> do
+        mTell [ChildGather cmdStr sub act]
+        childrenGather next
+      Free (CmdParserPeekInput nextF) -> do
+        childrenGather $ nextF $ inputToString inputInitial
+      Free (CmdParserPeekDesc nextF) -> do
+        parser <- mGet
+        -- partialDesc :: CommandDesc out <- mGet
+        -- partialStack :: CmdDescStack <- mGet
+        -- run the rest without affecting the actual stack
+        -- to retrieve the complete cmddesc.
+        cmdCur :: CommandDesc out <- mGet
+        let (cmd :: CommandDesc out, stack)
+              = runIdentity
+              $ MultiRWSS.runMultiRWSTNil
+              $ MultiRWSS.withMultiStateSA emptyCommandDesc
+                  { _cmd_mParent = _cmd_mParent cmdCur } -- partialDesc
+              $ MultiRWSS.withMultiStateS (StackBottom mempty) -- partialStack
+              $ iterM processCmdShallow $ parser
+        childrenGather $ nextF $ () <$ postProcessCmd stack cmd
+      something -> return something
 
     processParsedParts
       :: forall m r w s m0 a
@@ -747,11 +814,11 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
           StackBottom{} -> do
             mTell ["unexpected stackBottom"]
           StackLayer descs _ up -> do
-            mSet $ descStackAdd (PartReorder (reverse descs)) up
+            mSet $ descStackAdd (PartReorder (Data.Foldable.toList descs)) up
         return next
       Free (CmdParserGrouped groupName next) -> do
         stackCur <- mGet
-        mSet $ StackLayer [] groupName stackCur
+        mSet $ StackLayer mempty groupName stackCur
         processParsedParts $ next
       Free (CmdParserGroupEnd next) -> do
         stackCur <- mGet
@@ -760,7 +827,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
             mTell $ ["butcher interface error: group end without group start"]
             return $ next -- hard abort should be fine for this case.
           StackLayer descs groupName up -> do
-            mSet $ descStackAdd (PartRedirect groupName (PartSeq (reverse descs))) up
+            mSet $ descStackAdd (PartRedirect groupName (PartSeq (Data.Foldable.toList descs))) up
             processParsedParts $ next        
       Pure x -> return $ return $ x
       f -> do
@@ -780,7 +847,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
           pid <- mGet
           mSet $ pid + 1
           parsedMap :: PartParsedData <- mGet
-          mSet $ Map.delete pid parsedMap
+          mSet $ MapS.delete pid parsedMap
           partMap :: Map Int (PartGatherData f) <- mGet
           input :: Input <- mGet
           let errorResult = do
@@ -795,8 +862,8 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
               continueOrMisuse :: Maybe p -> m (CmdParser f out a)
               continueOrMisuse = maybe monadMisuseError
                                        (processParsedParts . nextF)
-          case Map.lookup pid parsedMap of
-            Nothing -> case Map.lookup pid partMap of
+          case MapS.lookup pid parsedMap of
+            Nothing -> case MapS.lookup pid partMap of
               Nothing -> monadMisuseError -- it would still be in the map
                                           -- if it never had been successfully
                                           -- parsed, as indicicated by the
@@ -823,8 +890,8 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
           pid <- mGet
           mSet $ pid + 1
           m :: PartParsedData <- mGet
-          mSet $ Map.delete pid m
-          let partDyns = case Map.lookup pid m of
+          mSet $ MapS.delete pid m
+          let partDyns = case MapS.lookup pid m of
                 Nothing -> []
                 Just r -> r
           case mapM fromDynamic partDyns of
@@ -848,7 +915,9 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
         mSet $ cmd { _cmd_synopsis = Just $ PP.text s }
         next
       CmdParserPeekDesc nextF -> do
-        mGet >>= nextF
+        mGet >>= nextF . fmap (\(_ :: out) -> ())
+      CmdParserPeekInput nextF -> do
+        nextF $ inputToString inputInitial
       CmdParserPart desc _parseF _act nextF -> do
         do
           stackCur <- mGet
@@ -870,14 +939,16 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
           mSet $ descStackAdd (wrapBoundDesc bound desc) stackCur
         nextF monadMisuseError
       CmdParserChild cmdStr _sub _act next -> do
-        cmd_children %=+ ((cmdStr, emptyCommandDesc :: CommandDesc out):)
+        mExisting <- takeCommandChild cmdStr
+        let childDesc :: CommandDesc out = fromMaybe emptyCommandDesc mExisting
+        cmd_children %=+ Deque.snoc (cmdStr, childDesc)
         next
       CmdParserImpl out     next -> do
         cmd_out .=+ Just out
         next
       CmdParserGrouped groupName next -> do
         stackCur <- mGet
-        mSet $ StackLayer [] groupName stackCur
+        mSet $ StackLayer mempty groupName stackCur
         next
       CmdParserGroupEnd next -> do
         stackCur <- mGet
@@ -887,19 +958,19 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
           StackLayer _descs "" _up -> do
             return ()
           StackLayer descs groupName up -> do
-            mSet $ descStackAdd (PartRedirect groupName (PartSeq (reverse descs))) up
+            mSet $ descStackAdd (PartRedirect groupName (PartSeq (Data.Foldable.toList descs))) up
             next
       CmdParserReorderStop next -> do
         stackCur <- mGet
         case stackCur of
           StackBottom{} -> return ()
           StackLayer descs "" up -> do
-            mSet $ descStackAdd (PartReorder (reverse descs)) up
+            mSet $ descStackAdd (PartReorder (Data.Foldable.toList descs)) up
           StackLayer{} -> return ()
         next
       CmdParserReorderStart next -> do
         stackCur <- mGet
-        mSet $ StackLayer [] "" stackCur
+        mSet $ StackLayer mempty "" stackCur
         next
 
     failureCurrentShallowRerun
@@ -921,9 +992,8 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
     postProcessCmd descStack cmd
       = descFixParents
       $ cmd { _cmd_parts    = case descStack of
-                StackBottom l -> reverse l
+                StackBottom l -> Data.Foldable.toList l
                 StackLayer{} -> []
-            , _cmd_children = reverse $ _cmd_children cmd
             }
 
     monadMisuseError :: a
@@ -955,6 +1025,45 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
         InputString s -> mSet $ InputString $ dropWhile Char.isSpace s
         InputArgs{}   -> return ()
 
+    inputToString :: Input -> String
+    inputToString (InputString s) = s
+    inputToString (InputArgs ss) = List.unwords ss
+
+dequeLookupRemove :: String -> Deque (String, a) -> (Maybe a, Deque (String, a))
+dequeLookupRemove key deque = case Deque.uncons deque of
+  Nothing -> (Nothing, mempty)
+  Just ((k, v), rest) -> if k==key
+    then (Just v, rest)
+    else let (r, rest') = dequeLookupRemove key rest
+          in (r, Deque.cons (k, v) rest')
+
+takeCommandChild
+  :: MonadMultiState (CommandDesc out) m
+  => String
+  -> m (Maybe (CommandDesc out))
+takeCommandChild key = do
+  cmd <- mGet
+  let (r, children') = dequeLookupRemove key $ _cmd_children cmd
+  mSet cmd { _cmd_children = children' }
+  return r
+
+mapOut :: (outa -> outb) -> CmdParser f outa () -> CmdParser f outb ()
+mapOut f = hoistFree $ \case
+  CmdParserHelp     doc r               -> CmdParserHelp doc r
+  CmdParserSynopsis s   r               -> CmdParserSynopsis s r
+  CmdParserPeekDesc  fr                 -> CmdParserPeekDesc fr
+  CmdParserPeekInput fr                 -> CmdParserPeekInput fr
+  CmdParserPart desc fp fa fr           -> CmdParserPart desc fp fa fr
+  CmdParserPartMany bound desc fp fa fr -> CmdParserPartMany bound desc fp fa fr
+  CmdParserPartInp desc fp fa fr        -> CmdParserPartInp desc fp fa fr
+  CmdParserPartManyInp bound desc fp fa fr ->
+    CmdParserPartManyInp bound desc fp fa fr
+  CmdParserChild s child act r -> CmdParserChild s (mapOut f child) act r
+  CmdParserImpl out r          -> CmdParserImpl (f out) r
+  CmdParserReorderStart r      -> CmdParserReorderStart r
+  CmdParserReorderStop  r      -> CmdParserReorderStop r
+  CmdParserGrouped s r         -> CmdParserGrouped s r
+  CmdParserGroupEnd r          -> CmdParserGroupEnd r
 
 -- cmdActionPartial :: CommandDesc out -> Either String out
 -- cmdActionPartial = maybe (Left err) Right . _cmd_out

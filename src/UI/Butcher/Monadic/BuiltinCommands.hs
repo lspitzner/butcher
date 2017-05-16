@@ -34,12 +34,13 @@ addHelpCommand desc = addCmd "help" $ do
   rest <- addRestOfInputStringParam "SUBCOMMAND(s)" mempty
   addCmdImpl $ do
     let parentDesc = maybe undefined snd (_cmd_mParent desc)
-    let restWords = List.words rest
+    let restWords  = List.words rest
     let descent :: [String] -> CommandDesc a -> CommandDesc a
         descent [] curDesc = curDesc
-        descent (w:wr) curDesc = case List.lookup w $ _cmd_children curDesc of
-          Nothing    -> curDesc
-          Just child -> descent wr child
+        descent (w:wr) curDesc =
+          case List.lookup w $ Data.Foldable.toList $ _cmd_children curDesc of
+            Nothing    -> curDesc
+            Just child -> descent wr child
     print $ ppHelpShallow $ descent restWords parentDesc
 
 -- | Adds a help command that prints help for the command currently in context.

@@ -28,6 +28,7 @@ module UI.Butcher.Monadic
     -- * Builtin commands
   , addHelpCommand
   , addButcherDebugCommand
+  , mapOut
   )
 where
 

@@ -69,6 +69,33 @@ simpleRunTest = do
     it "flag 3" $ testRunA testCmd3 "abc -g" `shouldBe` Right 2
     it "flag 4" $ testRunA testCmd3 "abc -f -g" `shouldBe` Right 3
     it "flag 5" $ testRunA testCmd3 "abc -g -f" `shouldBe` Right 3
+  describe "separated children" $ do
+    it "case 1" $ testRun testCmd4 "a aa" `shouldBe` Right (Just 1)
+    it "case 2" $ testRun testCmd4 "a ab" `shouldBe` Right (Just 2)
+    it "case 3" $ testRun testCmd4 "b ba" `shouldBe` Right (Just 3)
+    it "case 4" $ testRun testCmd4 "b bb" `shouldBe` Right (Just 4)
+    it "doc" $ show (ppHelpShallow (getDoc "" testCmd4)) `shouldBe`
+      List.unlines
+        [ "NAME"
+        , ""
+        , "  test"
+        , ""
+        , "USAGE"
+        , ""
+        , "  test a | b"
+        ]
+    it "doc" $ show (ppHelpShallow (getDoc "a" testCmd4)) `shouldBe`
+      List.unlines
+        [ "NAME"
+        , ""
+        , "  test a"
+        , ""
+        , "USAGE"
+        , ""
+        , "  test a aa | ab"
+        ]
+
+
 
 
 testCmd1 :: CmdParser Identity (WriterS.Writer (Sum Int) ()) ()
@@ -110,6 +137,21 @@ testCmd3 = do
   addCmd "def" $ do
     addCmdImpl ()
 
+testCmd4 :: CmdParser Identity (WriterS.Writer (Sum Int) ()) ()
+testCmd4 = do
+  addCmd "a" $ do
+    addCmd "aa" $ do
+      addCmdImpl $ WriterS.tell 1
+  addCmd "b" $ do
+    addCmd "bb" $ do
+      addCmdImpl $ WriterS.tell 4
+  addCmd "a" $ do
+    addCmd "ab" $ do
+      addCmdImpl $ WriterS.tell 2
+  addCmd "b" $ do
+    addCmd "ba" $ do
+      addCmdImpl $ WriterS.tell 3
+
 testParse :: CmdParser Identity out () -> String -> Maybe (CommandDesc out)
 testParse cmd s = either (const Nothing) Just
                 $ snd
@@ -124,3 +166,6 @@ testRunA :: CmdParser (StateS.State Int) () () -> String -> Either ParsingError 
 testRunA cmd str = (\((_, e), s) -> e $> s)
                  $ flip StateS.runState (0::Int)
                  $ runCmdParserA Nothing (InputString str) cmd
+
+getDoc :: String -> CmdParser Identity out () -> CommandDesc ()
+getDoc s = fst . runCmdParser (Just "test") (InputString s)
