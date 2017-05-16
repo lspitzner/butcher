@@ -85,3 +85,11 @@ import           UI.Butcher.Monadic.Internal.Types
 import           UI.Butcher.Monadic.Internal.Core
 import           UI.Butcher.Monadic.Flag
 import           UI.Butcher.Monadic.Param
+
+
+
+-- | Safe wrapper around 'reorderStart'/'reorderStop' for cases where reducing
+-- to a single binding is possible/preferable.
+withReorder :: CmdParser f out a -> CmdParser f out a
+withReorder x = reorderStart *> x <* reorderStop
+

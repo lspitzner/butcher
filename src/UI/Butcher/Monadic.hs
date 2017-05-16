@@ -8,7 +8,8 @@ module UI.Butcher.Monadic
   , CommandDesc(_cmd_out)
   , cmd_out
   , -- * Run or Check CmdParsers
-    runCmdParser
+    runCmdParserSimple
+  , runCmdParser
   , runCmdParserExt
   , runCmdParserA
   , runCmdParserAExt
@@ -75,6 +76,16 @@ runCmdParserWithHelpDesc mProgName input cmdF =
           , either (const emptyCommandDesc) id $ checkResult
           )
   in runCmdParser mProgName input (cmdF fullDesc)
+
+
+-- | Wrapper around 'runCmdParser' for very simple usage: Accept a @String@
+-- input and return only the output from the parser, returning @Nothing@ in
+-- any error case.
+runCmdParserSimple :: String -> CmdParser Identity out () -> Either String out
+runCmdParserSimple s p = case snd $ runCmdParser Nothing (InputString s) p of
+  Left e -> Left $ show e
+  Right desc ->
+    maybe (Left "command has no implementation") Right $ _cmd_out desc
 
 
 --------------------------------------
