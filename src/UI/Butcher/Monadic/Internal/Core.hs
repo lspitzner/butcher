@@ -112,6 +112,7 @@ addCmdHelpStr s = liftF $ CmdParserHelp (PP.text s) ()
 -- | Semi-hacky way of accessing the output CommandDesc from inside of a
 -- 'CmdParser'. This is not implemented via knot-tying, i.e. the CommandDesc
 -- you get is _not_ equivalent to the CommandDesc returned by 'runCmdParser'.
+-- Also see 'runCmdParserWithHelpDesc' which does knot-tying.
 --
 -- For best results, use this "below"
 -- any 'addCmd' invocations in the current context, e.g. directly before
@@ -119,9 +120,19 @@ addCmdHelpStr s = liftF $ CmdParserHelp (PP.text s) ()
 peekCmdDesc :: CmdParser f out (CommandDesc ())
 peekCmdDesc = liftF $ CmdParserPeekDesc id
 
+-- | Semi-hacky way of accessing the current input that is not yet processed.
+-- This must not be used to do any parsing. The purpose of this function is
+-- to provide a String to be used for output to the user, as feedback about
+-- what command was executed. For example we may think of an interactive
+-- program reacting to commandline input such as
+-- "run --delay 60 fire-rockets" which shows a 60 second delay on the
+-- "fire-rockets" command. The latter string could have been obtained
+-- via 'peekInput' after having parsed "run --delay 60" already.
 peekInput :: CmdParser f out String
 peekInput = liftF $ CmdParserPeekInput id
 
+-- | Add part that is expected to occur exactly once in the input. May
+-- succeed on empty input (e.g. by having a default).
 addCmdPart
   :: (Applicative f, Typeable p)
   => PartDesc
@@ -137,6 +148,8 @@ addCmdPartA
   -> CmdParser f out p
 addCmdPartA p f a = liftF $ CmdParserPart p f a id
 
+-- | Add part that is not required to occur, and can occur as often as
+-- indicated by 'ManyUpperBound'. Must not succeed on empty input.
 addCmdPartMany
   :: (Applicative f, Typeable p)
   => ManyUpperBound
@@ -154,6 +167,11 @@ addCmdPartManyA
   -> CmdParser f out [p]
 addCmdPartManyA b p f a = liftF $ CmdParserPartMany b p f a id
 
+-- | Add part that is expected to occur exactly once in the input. May
+-- succeed on empty input (e.g. by having a default).
+--
+-- Only difference to 'addCmdPart' is that it accepts 'Input', i.e. can
+-- behave differently for @String@ and @[String]@ input.
 addCmdPartInp
   :: (Applicative f, Typeable p)
   => PartDesc
@@ -169,6 +187,11 @@ addCmdPartInpA
   -> CmdParser f out p
 addCmdPartInpA p f a = liftF $ CmdParserPartInp p f a id
 
+-- | Add part that is not required to occur, and can occur as often as
+-- indicated by 'ManyUpperBound'. Must not succeed on empty input.
+--
+-- Only difference to 'addCmdPart' is that it accepts 'Input', i.e. can
+-- behave differently for @String@ and @[String]@ input.
 addCmdPartManyInp
   :: (Applicative f, Typeable p)
   => ManyUpperBound
@@ -1047,6 +1070,7 @@ takeCommandChild key = do
   mSet cmd { _cmd_children = children' }
   return r
 
+-- | map over the @out@ type argument
 mapOut :: (outa -> outb) -> CmdParser f outa () -> CmdParser f outb ()
 mapOut f = hoistFree $ \case
   CmdParserHelp     doc r               -> CmdParserHelp doc r

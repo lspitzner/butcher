@@ -52,6 +52,7 @@ data ParsingError = ParsingError
   }
   deriving (Show, Eq)
 
+-- | Specifies whether we accept 0-1 or 0-n for @CmdParserPart@s.
 data ManyUpperBound
   = ManyUpperBound1
   | ManyUpperBoundN
