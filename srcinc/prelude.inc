@@ -351,6 +351,7 @@ import System.IO                          ( hFlush
                                           )
 
 import Data.Typeable                      ( Typeable
+                                          , cast
                                           )
 
 import Control.Arrow                      ( first
