@@ -59,7 +59,7 @@ import           UI.Butcher.Monadic.Internal.Core
 -- > playground [--short] NAME [version | help]
 ppUsage :: CommandDesc a -> PP.Doc
 ppUsage (CommandDesc mParent _help _syn parts out children) = pparents mParent
-  <+> PP.fsep (partDocs ++ [subsDoc])
+  <+> PP.sep [PP.fsep partDocs, subsDoc]
  where
   pparents :: Maybe (String, CommandDesc out) -> PP.Doc
   pparents Nothing        = PP.empty
