@@ -213,7 +213,7 @@ ppPartDescUsage = \case
                           _          -> True
                         )
                         ps
-    in  PP.brackets (PP.fsep $ rec <$> flags) <+> PP.fsep (rec <$> params)
+    in  PP.sep [PP.brackets (PP.fsep $ rec <$> flags), PP.fsep (rec <$> params)]
  where
   rec = ppPartDescUsage
 
