@@ -208,12 +208,15 @@ ppPartDescUsage = \case
   PartWithHelp _ p -> rec p
   PartReorder ps ->
     let flags  = [ d | PartMany d <- ps ]
-        params = filter ( \case
-                          PartMany{} -> False
-                          _          -> True
-                        )
-                        ps
-    in  PP.sep [PP.brackets (PP.fsep $ rec <$> flags), PP.fsep (rec <$> params)]
+        params = filter
+          ( \case
+            PartMany{} -> False
+            _          -> True
+          )
+          ps
+    in  PP.sep
+          [(PP.fsep $ PP.brackets . rec <$> flags), PP.fsep (rec <$> params)]
+
  where
   rec = ppPartDescUsage
 
