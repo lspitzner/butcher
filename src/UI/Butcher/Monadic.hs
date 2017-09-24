@@ -79,8 +79,8 @@ runCmdParserWithHelpDesc mProgName input cmdF =
 
 
 -- | Wrapper around 'runCmdParser' for very simple usage: Accept a @String@
--- input and return only the output from the parser, returning @Nothing@ in
--- any error case.
+-- input and return only the output from the parser, or a plain error string
+-- on failure.
 runCmdParserSimple :: String -> CmdParser Identity out () -> Either String out
 runCmdParserSimple s p = case snd $ runCmdParser Nothing (InputString s) p of
   Left e -> Left $ parsingErrorString e
