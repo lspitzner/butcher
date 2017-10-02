@@ -1,4 +1,9 @@
-# Revision history for cmdparse-applicative
+# Revision history for butcher
+
+## 1.1.1.0  -- October 2017
+
+* Add `addNullCmd` function that descends into childcommand on an epsilon match
+* Add `addStringParams` function that reads all remaining words
 
 ## 1.1.0.2  -- September 2017
 
