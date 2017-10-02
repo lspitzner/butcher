@@ -21,6 +21,7 @@ module UI.Butcher.Monadic.Internal.Core
   , addCmdPartManyInp
   , addCmdPartManyInpA
   , addCmd
+  , addNullCmd
   , addCmdImpl
   , reorderStart
   , reorderStop
@@ -215,7 +216,14 @@ addCmd
   => String -- ^ command name
   -> CmdParser f out () -- ^ subcommand
   -> CmdParser f out ()
-addCmd str sub = liftF $ CmdParserChild str sub (pure ()) ()
+addCmd str sub = liftF $ CmdParserChild (Just str) sub (pure ()) ()
+
+-- | Add a new nameless child command in the current context. Nameless means
+-- that this command matches the empty input, i.e. will always apply.
+-- This feature is experimental and CommandDesc pretty-printing might not
+-- correctly in presense of nullCmds.
+addNullCmd :: Applicative f => CmdParser f out () -> CmdParser f out ()
+addNullCmd sub = liftF $ CmdParserChild Nothing sub (pure ()) ()
 
 -- | Add an implementation to the current command.
 addCmdImpl :: out -> CmdParser f out ()
@@ -264,7 +272,7 @@ data PartGatherData f
     , _pgd_many   :: Bool
     }
 
-data ChildGather f out = ChildGather String (CmdParser f out ()) (f ())
+data ChildGather f out = ChildGather (Maybe String) (CmdParser f out ()) (f ())
 
 type PartParsedData = Map Int [Dynamic]
 
@@ -301,7 +309,7 @@ checkCmdParser mTopLevel cmdParser
     final (desc, stack)
       = case stack of
         StackBottom descs -> Right
-                           $ descFixParentsWithTopM (mTopLevel <&> \n -> (n, emptyCommandDesc))
+                           $ descFixParentsWithTopM (mTopLevel <&> \n -> (Just n, emptyCommandDesc))
                            $ () <$ desc
           { _cmd_parts = Data.Foldable.toList descs
           }
@@ -461,7 +469,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
     $ processMain cmdParser
   where
     initialCommandDesc = emptyCommandDesc
-      { _cmd_mParent = mTopLevel <&> \n -> (n, emptyCommandDesc) }
+      { _cmd_mParent = mTopLevel <&> \n -> (Just n, emptyCommandDesc) }
     captureFinal
       :: ([String], (CmdDescStack, (Input, (PastCommandInput, (CommandDesc out, f())))))
       -> f (CommandDesc (), Input, Either ParsingError (CommandDesc out))
@@ -599,9 +607,9 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
           MultiRWSS.withMultiWriterWA $ childrenGather f
         let
           child_fold
-            :: (Deque String, Map String (CmdParser f out (), f ()))
+            :: (Deque (Maybe String), Map (Maybe String) (CmdParser f out (), f ()))
             -> ChildGather f out
-            -> (Deque String, Map String (CmdParser f out (), f ()))
+            -> (Deque (Maybe String), Map (Maybe String) (CmdParser f out (), f ()))
           child_fold (c_names, c_map) (ChildGather name child act) =
             case name `MapS.lookup` c_map of
               Nothing ->
@@ -619,14 +627,16 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
             foldl' child_fold (mempty, MapS.empty) gatheredChildren
           combined_child_list = Data.Foldable.toList child_name_list <&> \n ->
             (n, child_map MapS.! n)
-        let mRest = asum $ combined_child_list <&> \(name, (child, act)) ->
-              case input of
-                InputString str | name == str ->
-                  Just $ (name, child, act, InputString "")
-                InputString str | (name++" ") `isPrefixOf` str ->
-                  Just $ (name, child, act, InputString $ drop (length name + 1) str)
-                InputArgs (str:strr) | name == str ->
-                  Just $ (name, child, act, InputArgs strr)
+        let mRest = asum $ combined_child_list <&> \(mname, (child, act)) ->
+              case (mname, input) of
+                (Just name, InputString str) | name == str ->
+                  Just $ (Just name, child, act, InputString "")
+                (Just name, InputString str) | (name++" ") `isPrefixOf` str ->
+                  Just $ (Just name, child, act, InputString $ drop (length name + 1) str)
+                (Just name, InputArgs (str:strr)) | name == str ->
+                  Just $ (Just name, child, act, InputArgs strr)
+                (Nothing, _) ->
+                  Just $ (Nothing, child, act, input)
                 _ -> Nothing
         case mRest of
           Nothing -> do -- a child not matching what we have in the input
@@ -1051,7 +1061,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser
     inputToString (InputString s) = s
     inputToString (InputArgs ss) = List.unwords ss
 
-dequeLookupRemove :: String -> Deque (String, a) -> (Maybe a, Deque (String, a))
+dequeLookupRemove :: Eq k => k -> Deque (k, a) -> (Maybe a, Deque (k, a))
 dequeLookupRemove key deque = case Deque.uncons deque of
   Nothing -> (Nothing, mempty)
   Just ((k, v), rest) -> if k==key
@@ -1061,7 +1071,7 @@ dequeLookupRemove key deque = case Deque.uncons deque of
 
 takeCommandChild
   :: MonadMultiState (CommandDesc out) m
-  => String
+  => Maybe String
   -> m (Maybe (CommandDesc out))
 takeCommandChild key = do
   cmd <- mGet
@@ -1120,20 +1130,20 @@ descFixParents = descFixParentsWithTopM Nothing
 -- descFixParentsWithTop :: String -> CommandDesc a -> CommandDesc a
 -- descFixParentsWithTop s = descFixParentsWithTopM (Just (s, emptyCommandDesc))
 
-descFixParentsWithTopM :: Maybe (String, CommandDesc a) -> CommandDesc a -> CommandDesc a
+descFixParentsWithTopM :: Maybe (Maybe String, CommandDesc a) -> CommandDesc a -> CommandDesc a
 descFixParentsWithTopM mTop topDesc = Data.Function.fix $ \fixed -> topDesc
         { _cmd_mParent  = goUp fixed <$> (mTop <|> _cmd_mParent topDesc)
         , _cmd_children = _cmd_children topDesc <&> goDown fixed
         }
   where
-    goUp :: CommandDesc a -> (String, CommandDesc a) -> (String, CommandDesc a)
+    goUp :: CommandDesc a -> (Maybe String, CommandDesc a) -> (Maybe String, CommandDesc a)
     goUp child (childName, parent) = (,) childName $ Data.Function.fix $ \fixed -> parent
       { _cmd_mParent = goUp fixed <$> _cmd_mParent parent
       , _cmd_children = _cmd_children parent <&> \(n, c) -> if n==childName
           then (n, child)
           else (n, c)
       }
-    goDown :: CommandDesc a -> (String, CommandDesc a) -> (String, CommandDesc a)
+    goDown :: CommandDesc a -> (Maybe String, CommandDesc a) -> (Maybe String, CommandDesc a)
     goDown parent (childName, child) = (,) childName $ Data.Function.fix $ \fixed -> child
       { _cmd_mParent = Just (childName, parent)
       , _cmd_children = _cmd_children child <&> goDown fixed

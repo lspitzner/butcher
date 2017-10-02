@@ -53,6 +53,7 @@
 
 module UI.Butcher.Monadic.Command
   ( addCmd
+  , addNullCmd
   , addCmdImpl
   , addCmdSynopsis
   , addCmdHelp

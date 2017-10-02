@@ -61,9 +61,10 @@ ppUsage :: CommandDesc a -> PP.Doc
 ppUsage (CommandDesc mParent _help _syn parts out children) = pparents mParent
   <+> PP.sep [PP.fsep partDocs, subsDoc]
  where
-  pparents :: Maybe (String, CommandDesc out) -> PP.Doc
-  pparents Nothing        = PP.empty
-  pparents (Just (n, cd)) = pparents (_cmd_mParent cd) <+> PP.text n
+  pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
+  pparents Nothing              = PP.empty
+  pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) <+> PP.text n
+  pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
   partDocs = parts <&> ppPartDescUsage
   subsDoc  = case out of
     _ | null children -> PP.empty -- TODO: remove debug
@@ -72,10 +73,9 @@ ppUsage (CommandDesc mParent _help _syn parts out children) = pparents mParent
     Just{} -> PP.brackets $ subDoc
   subDoc =
     PP.fcat
-      $   PP.punctuate (PP.text " | ")
-      $   Data.Foldable.toList
-      $   children
-      <&> \(n, _) -> PP.text n
+      $ PP.punctuate (PP.text " | ")
+      $ Data.Foldable.toList
+      $ [ PP.text n | (Just n, _) <- children ]
 
 -- | ppUsageWithHelp exampleDesc yields:
 --
@@ -87,9 +87,10 @@ ppUsageWithHelp :: CommandDesc a -> PP.Doc
 ppUsageWithHelp (CommandDesc mParent help _syn parts out children) =
   pparents mParent <+> PP.fsep (partDocs ++ [subsDoc]) PP.<> helpDoc
  where
-  pparents :: Maybe (String, CommandDesc out) -> PP.Doc
-  pparents Nothing        = PP.empty
-  pparents (Just (n, cd)) = pparents (_cmd_mParent cd) <+> PP.text n
+  pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
+  pparents Nothing              = PP.empty
+  pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) <+> PP.text n
+  pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
   partDocs = parts <&> ppPartDescUsage
   subsDoc  = case out of
     _ | null children -> PP.empty -- TODO: remove debug
@@ -98,10 +99,9 @@ ppUsageWithHelp (CommandDesc mParent help _syn parts out children) =
     Just{} -> PP.brackets $ subDoc
   subDoc =
     PP.fcat
-      $   PP.punctuate (PP.text " | ")
-      $   Data.Foldable.toList
-      $   children
-      <&> \(n, _) -> PP.text n
+      $ PP.punctuate (PP.text " | ")
+      $ Data.Foldable.toList
+      $ [ PP.text n | (Just n, _) <- children ]
   helpDoc = case help of
     Nothing -> PP.empty
     Just h  -> PP.text ":" PP.<+> h
@@ -117,7 +117,7 @@ ppUsageAt :: [String] -- (sub)command sequence
 ppUsageAt strings desc =
   case strings of
     [] -> Just $ ppUsage desc
-    (s:sr) -> find ((s==) . fst) (_cmd_children desc) >>= ppUsageAt sr . snd
+    (s:sr) -> find ((Just s==) . fst) (_cmd_children desc) >>= ppUsageAt sr . snd
 
 -- | ppHelpShalloe exampleDesc yields:
 --
@@ -137,60 +137,56 @@ ppUsageAt strings desc =
 -- > 
 -- >   --short             make the greeting short
 -- >   NAME                your name, so you can be greeted properly
-ppHelpShallow :: CommandDesc a
-              -> PP.Doc
+ppHelpShallow :: CommandDesc a -> PP.Doc
 ppHelpShallow desc@(CommandDesc mParent syn help parts _out _children) =
-        nameSection
+  nameSection
     $+$ usageSection
     $+$ descriptionSection
     $+$ partsSection
     $+$ PP.text ""
-  where
-    nameSection = case mParent of
-      Nothing -> PP.empty
-      Just{} ->
-            PP.text "NAME"
+ where
+  nameSection = case mParent of
+    Nothing -> PP.empty
+    Just{} ->
+      PP.text "NAME"
         $+$ PP.text ""
-        $+$ PP.nest 2 (case syn of
-                        Nothing -> pparents mParent
-                        Just s ->  pparents mParent <+> PP.text "-" <+> s)
+        $+$ PP.nest
+              2
+              ( case syn of
+                Nothing -> pparents mParent
+                Just s  -> pparents mParent <+> PP.text "-" <+> s
+              )
         $+$ PP.text ""
-    pparents :: Maybe (String, CommandDesc out) -> PP.Doc
-    pparents Nothing = PP.empty
-    pparents (Just (n, cd)) = pparents (_cmd_mParent cd) PP.<+> PP.text n
-    usageSection =
-            PP.text "USAGE"
-        $+$ PP.text ""
-        $+$ PP.nest 2 (ppUsage desc)
-    descriptionSection = case help of
-      Nothing -> PP.empty
-      Just h ->
-            PP.text ""
-        $+$ PP.text "DESCRIPTION"
-        $+$ PP.text ""
-        $+$ PP.nest 2 h
-    partsSection = if null partsTuples then PP.empty else
-            PP.text ""
-        $+$ PP.text "ARGUMENTS"
-        $+$ PP.text ""
-        $+$ PP.nest 2 (PP.vcat partsTuples)
-    partsTuples :: [PP.Doc]
-    partsTuples = parts >>= go
-      where
-        go = \case
-          PartLiteral{} -> []
-          PartVariable{} -> []
-          PartOptional p -> go p
-          PartAlts ps -> ps >>= go
-          PartSeq  ps -> ps >>= go
-          PartDefault _ p -> go p
-          PartSuggestion _ p -> go p
-          PartRedirect s p -> [PP.text s $$ PP.nest 20 (ppPartDescUsage p)]
-                           ++ (PP.nest 2 <$> go p)
-          PartReorder ps -> ps >>= go
-          PartMany p -> go p
-          PartWithHelp doc p -> [ppPartDescHeader p $$ PP.nest 20 doc]
-                             ++ go p
+  pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
+  pparents Nothing              = PP.empty
+  pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) PP.<+> PP.text n
+  pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
+  usageSection = PP.text "USAGE" $+$ PP.text "" $+$ PP.nest 2 (ppUsage desc)
+  descriptionSection = case help of
+    Nothing -> PP.empty
+    Just h ->
+      PP.text "" $+$ PP.text "DESCRIPTION" $+$ PP.text "" $+$ PP.nest 2 h
+  partsSection = if null partsTuples
+    then PP.empty
+    else PP.text "" $+$ PP.text "ARGUMENTS" $+$ PP.text "" $+$ PP.nest
+      2
+      (PP.vcat partsTuples)
+  partsTuples :: [PP.Doc]
+  partsTuples = parts >>= go
+   where
+    go = \case
+      PartLiteral{}      -> []
+      PartVariable{}     -> []
+      PartOptional p     -> go p
+      PartAlts     ps    -> ps >>= go
+      PartSeq      ps    -> ps >>= go
+      PartDefault    _ p -> go p
+      PartSuggestion _ p -> go p
+      PartRedirect s p ->
+        [PP.text s $$ PP.nest 20 (ppPartDescUsage p)] ++ (PP.nest 2 <$> go p)
+      PartReorder ps     -> ps >>= go
+      PartMany    p      -> go p
+      PartWithHelp doc p -> [ppPartDescHeader p $$ PP.nest 20 doc] ++ go p
 
 -- | Internal helper; users probably won't need this.
 ppPartDescUsage :: PartDesc -> PP.Doc

@@ -38,7 +38,7 @@ addHelpCommand desc = addCmd "help" $ do
     let descent :: [String] -> CommandDesc a -> CommandDesc a
         descent [] curDesc = curDesc
         descent (w:wr) curDesc =
-          case List.lookup w $ Data.Foldable.toList $ _cmd_children curDesc of
+          case List.lookup (Just w) $ Data.Foldable.toList $ _cmd_children curDesc of
             Nothing    -> curDesc
             Just child -> descent wr child
     print $ ppHelpShallow $ descent restWords parentDesc

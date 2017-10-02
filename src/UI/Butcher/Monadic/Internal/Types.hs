@@ -68,7 +68,7 @@ data CmdParserF f out a
   | forall p . Typeable p => CmdParserPartMany ManyUpperBound PartDesc (String -> Maybe (p, String)) (p -> f ()) ([p] -> a)
   | forall p . Typeable p => CmdParserPartInp PartDesc (Input -> Maybe (p, Input)) (p -> f ()) (p -> a)
   | forall p . Typeable p => CmdParserPartManyInp ManyUpperBound PartDesc (Input -> Maybe (p, Input)) (p -> f ()) ([p] -> a)
-  |                          CmdParserChild String (CmdParser f out ()) (f ()) a
+  |                          CmdParserChild (Maybe String) (CmdParser f out ()) (f ()) a
   |                          CmdParserImpl  out                                a
   |                          CmdParserReorderStart                             a
   |                          CmdParserReorderStop                              a
@@ -109,14 +109,14 @@ type CmdParser f out = Free (CmdParserF f out)
 -- Note that there is the '_cmd_out' accessor that contains @Maybe out@ which
 -- might be useful after successful parsing.
 data CommandDesc out = CommandDesc
-  { _cmd_mParent  :: Maybe (String, CommandDesc out)
+  { _cmd_mParent  :: Maybe (Maybe String, CommandDesc out)
   , _cmd_synopsis :: Maybe PP.Doc
   , _cmd_help     :: Maybe PP.Doc
   , _cmd_parts    :: [PartDesc]
   , _cmd_out      :: Maybe out
-  , _cmd_children :: Deque (String, CommandDesc out) -- we don't use a Map here
-                                                     -- because we'd like to
-                                                     -- retain the order.
+  , _cmd_children :: Deque (Maybe String, CommandDesc out)
+                     -- we don't use a Map here because we'd like to
+                     -- retain the order.
   }
 
 -- type PartSeqDesc = [PartDesc]

@@ -13,6 +13,7 @@ module UI.Butcher.Monadic.Param
   , addReadParamOpt
   , addStringParam
   , addStringParamOpt
+  , addStringParams
   , addRestOfInputStringParam
   )
 where
@@ -108,9 +109,9 @@ addReadParamOpt name par = addCmdPart desc parseF
       ((x, []):_)    -> Just (Just x, [])
       _ -> Just (Nothing, s) -- TODO: we could warn about a default..
 
--- | Add a parameter that matches any string of non-space characters if input
--- String, or one full argument if input is [String]. See the 'Input' doc for
--- this distinction.
+-- | Add a parameter that matches any string of non-space characters if
+-- input==String, or one full argument if input==[String]. See the 'Input' doc
+-- for this distinction.
 addStringParam
   :: forall f out . (Applicative f)
   => String
@@ -152,6 +153,28 @@ addStringParamOpt name par = addCmdPartInp desc parseF
     parseF (InputArgs args) = case args of
       (s1:sR) -> Just (Just s1, InputArgs sR)
       []      -> Just (Nothing, InputArgs [])
+
+-- | Add a parameter that matches any string of non-space characters if
+-- input==String, or one full argument if input==[String]. See the 'Input' doc
+-- for this distinction.
+addStringParams
+  :: forall f out
+   . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out [String]
+addStringParams name par = addCmdPartManyInp ManyUpperBoundN desc parseF
+ where
+  desc :: PartDesc
+  desc = (maybe id PartWithHelp $ _param_help par) $ PartVariable name
+  parseF :: Input -> Maybe (String, Input)
+  parseF (InputString str) =
+    case break Char.isSpace $ dropWhile Char.isSpace str of
+      ("", _   ) -> Nothing
+      (x , rest) -> Just (x, InputString rest)
+  parseF (InputArgs args) = case args of
+    (s1:sR) -> Just (s1, InputArgs sR)
+    []      -> Nothing
 
 
 -- | Add a parameter that consumes _all_ remaining input. Typical usecase is

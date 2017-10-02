@@ -103,7 +103,13 @@ simpleRunTest = do
     it "flag 6" $ testRun testCmd5 "abc -f" `shouldSatisfy` Data.Either.isLeft
     it "flag 6" $ testRun testCmd5 "abc -flag 0" `shouldSatisfy` Data.Either.isLeft
     it "flag 6" $ testRun testCmd5 "abc --f 0" `shouldSatisfy` Data.Either.isLeft
-
+  describe "addStringParams" $ do
+    it "case 1" $ testRun' testCmd6 "" `shouldBe` Right (Just ([], 0))
+    it "case 2" $ testRun' testCmd6 "-f" `shouldBe` Right (Just ([], 1))
+    it "case 3" $ testRun' testCmd6 "abc" `shouldBe` Right (Just (["abc"], 0))
+    it "case 4" $ testRun' testCmd6 "abc def" `shouldBe` Right (Just (["abc", "def"], 0))
+    it "case 5" $ testRun' testCmd6 "-g abc def" `shouldBe` Right (Just (["abc", "def"], 2))
+    it "case 6" $ testRun' testCmd6 "-f -g def" `shouldBe` Right (Just (["def"], 3))
 
 
 
@@ -167,6 +173,16 @@ testCmd5 = do
     x <- addFlagReadParam "f" ["flag"] "flag" (flagDefault (10::Int))
     addCmdImpl $ WriterS.tell (Sum x)
 
+testCmd6 :: CmdParser Identity (WriterS.Writer (Sum Int) [String]) ()
+testCmd6 = do
+  f <- addSimpleBoolFlag "f" ["flong"] mempty
+  g <- addSimpleBoolFlag "g" ["glong"] mempty
+  args <- addStringParams "ARGS" mempty
+  addCmdImpl $ do
+    when f $ WriterS.tell 1
+    when g $ WriterS.tell 2
+    pure args
+
 
 testParse :: CmdParser Identity out () -> String -> Maybe (CommandDesc out)
 testParse cmd s = either (const Nothing) Just
@@ -177,6 +193,13 @@ testRun :: CmdParser Identity (WriterS.Writer (Sum Int) ()) () -> String -> Eith
 testRun cmd s = fmap (fmap (getSum . WriterS.execWriter) . _cmd_out)
               $ snd
               $ runCmdParser Nothing (InputString s) cmd
+
+testRun' :: CmdParser Identity (WriterS.Writer (Sum Int) a) () -> String -> Either ParsingError (Maybe (a, Int))
+testRun' cmd s =
+  fmap (fmap (fmap getSum . WriterS.runWriter) . _cmd_out) $ snd $ runCmdParser
+    Nothing
+    (InputString s)
+    cmd
 
 testRunA :: CmdParser (StateS.State Int) () () -> String -> Either ParsingError Int
 testRunA cmd str = (\((_, e), s) -> e $> s)
