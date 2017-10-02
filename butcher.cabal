@@ -90,7 +90,6 @@ library
   ghc-options: {
     -Wall
     -fno-spec-constr
-    -j
     -fno-warn-unused-imports
     -fno-warn-orphans
   }
@@ -148,7 +147,6 @@ test-suite tests
   ghc-options: {
     -Wall
     -fno-spec-constr
-    -j
     -fno-warn-unused-imports
     -fno-warn-orphans
   }
