@@ -97,14 +97,14 @@ _cmds :: CmdParser Identity (IO ()) ()
 _cmds = do
   addCmd "echo" $ do
     addCmdHelpStr "print its parameter to output"
-    str <- addReadParam "STRING" (paramHelpStr "the string to print")
+    str <- addParamRead "STRING" (paramHelpStr "the string to print")
     addCmdImpl $ do
       putStrLn str
   addCmd "hello" $ do
     addCmdHelpStr "greet the user"
     reorderStart
     short <- addSimpleBoolFlag "" ["short"] mempty
-    name <- addReadParam "NAME" (paramHelpStr "your name, so you can be greeted properly"
+    name <- addParamRead "NAME" (paramHelpStr "your name, so you can be greeted properly"
                               <> paramDefault "user")
     reorderStop
     addCmdImpl $ do

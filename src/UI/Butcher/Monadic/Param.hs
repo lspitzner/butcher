@@ -9,7 +9,17 @@ module UI.Butcher.Monadic.Param
   , paramHelpStr
   , paramDefault
   , paramSuggestions
-  , addReadParam
+  , addParamRead
+  , addParamReadOpt
+  , addParamString
+  , addParamStringOpt
+  , addParamStrings
+  , addParamNoFlagString
+  , addParamNoFlagStringOpt
+  , addParamNoFlagStrings
+  , addParamRestOfInput
+  , -- * Deprecated for more consistent naming
+    addReadParam
   , addReadParamOpt
   , addStringParam
   , addStringParamOpt
@@ -74,6 +84,13 @@ paramSuggestions ss = mempty { _param_suggestions = Just ss }
 -- instance. Take care not to use this to return Strings unless you really
 -- want that, because it will require the quotation marks and escaping as
 -- is normal for the Show/Read instances for String.
+addParamRead :: forall f out a
+              . (Applicative f, Typeable a, Show a, Text.Read.Read a)
+             => String -- ^ paramater name, for use in usage/help texts
+             -> Param a -- ^ properties
+             -> CmdParser f out a
+addParamRead = addReadParam
+{-# DEPRECATED addReadParam "use 'addParamRead'" #-}
 addReadParam :: forall f out a
               . (Applicative f, Typeable a, Show a, Text.Read.Read a)
              => String -- ^ paramater name, for use in usage/help texts
@@ -92,6 +109,13 @@ addReadParam name par = addCmdPart desc parseF
       _ -> _param_default par <&> \x -> (x, s)
 
 -- | Like addReadParam, but optional. I.e. if reading fails, returns Nothing.
+addParamReadOpt :: forall f out a
+                 . (Applicative f, Typeable a, Text.Read.Read a)
+                => String -- ^ paramater name, for use in usage/help texts
+                -> Param a -- ^ properties
+                -> CmdParser f out (Maybe a)
+addParamReadOpt = addReadParamOpt
+{-# DEPRECATED addReadParamOpt "use 'addParamReadOpt'" #-}
 addReadParamOpt :: forall f out a
                  . (Applicative f, Typeable a, Text.Read.Read a)
                 => String -- ^ paramater name, for use in usage/help texts
@@ -112,6 +136,13 @@ addReadParamOpt name par = addCmdPart desc parseF
 -- | Add a parameter that matches any string of non-space characters if
 -- input==String, or one full argument if input==[String]. See the 'Input' doc
 -- for this distinction.
+addParamString
+  :: forall f out . (Applicative f)
+  => String
+  -> Param String
+  -> CmdParser f out String
+addParamString = addStringParam
+{-# DEPRECATED addStringParam "use 'addParamString'" #-}
 addStringParam
   :: forall f out . (Applicative f)
   => String
@@ -132,8 +163,15 @@ addStringParam name par = addCmdPartInp desc parseF
       (s1:sR) -> Just (s1, InputArgs sR)
       []      -> _param_default par <&> \x -> (x, InputArgs args)
 
--- | Like 'addStringParam', but optional, I.e. succeeding with Nothing if
+-- | Like 'addParamString', but optional, I.e. succeeding with Nothing if
 -- there is no remaining input.
+addParamStringOpt
+  :: forall f out . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out (Maybe String)
+addParamStringOpt = addStringParamOpt
+{-# DEPRECATED addStringParamOpt "use 'addParamStringOpt'" #-}
 addStringParamOpt
   :: forall f out . (Applicative f)
   => String
@@ -154,9 +192,18 @@ addStringParamOpt name par = addCmdPartInp desc parseF
       (s1:sR) -> Just (Just s1, InputArgs sR)
       []      -> Just (Nothing, InputArgs [])
 
+
 -- | Add a parameter that matches any string of non-space characters if
 -- input==String, or one full argument if input==[String]. See the 'Input' doc
 -- for this distinction.
+addParamStrings
+  :: forall f out
+   . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out [String]
+addParamStrings = addStringParams
+{-# DEPRECATED addStringParams "use 'addParamStrings'" #-}
 addStringParams
   :: forall f out
    . (Applicative f)
@@ -177,8 +224,88 @@ addStringParams name par = addCmdPartManyInp ManyUpperBoundN desc parseF
     []      -> Nothing
 
 
+-- | Like 'addParamString' but does not match strings starting with a dash.
+-- This prevents misinterpretation of flags as params.
+addParamNoFlagString
+  :: forall f out . (Applicative f)
+  => String
+  -> Param String
+  -> CmdParser f out String
+addParamNoFlagString name par = addCmdPartInp desc parseF
+ where
+  desc :: PartDesc
+  desc =
+    addSuggestion (_param_suggestions par)
+      $ (maybe id PartWithHelp $ _param_help par)
+      $ PartVariable name
+  parseF :: Input -> Maybe (String, Input)
+  parseF (InputString str) =
+    case break Char.isSpace $ dropWhile Char.isSpace str of
+      (""   , rest) -> _param_default par <&> \x -> (x, InputString rest)
+      ('-':_, _   ) -> _param_default par <&> \x -> (x, InputString str)
+      (x    , rest) -> Just (x, InputString rest)
+  parseF (InputArgs args) = case args of
+    []           -> _param_default par <&> \x -> (x, InputArgs args)
+    (('-':_):_ ) -> _param_default par <&> \x -> (x, InputArgs args)
+    (s1     :sR) -> Just (s1, InputArgs sR)
+
+-- | Like 'addParamStringOpt' but does not match strings starting with a dash.
+-- This prevents misinterpretation of flags as params.
+addParamNoFlagStringOpt
+  :: forall f out
+   . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out (Maybe String)
+addParamNoFlagStringOpt name par = addCmdPartInp desc parseF
+ where
+  desc :: PartDesc
+  desc =
+    PartOptional $ (maybe id PartWithHelp $ _param_help par) $ PartVariable name
+  parseF :: Input -> Maybe (Maybe String, Input)
+  parseF (InputString str) =
+    case break Char.isSpace $ dropWhile Char.isSpace str of
+      (""   , rest) -> Just (Nothing, InputString rest)
+      ('-':_, _   ) -> Just (Nothing, InputString str)
+      (x    , rest) -> Just (Just x, InputString rest)
+  parseF (InputArgs args) = case args of
+    []           -> Just (Nothing, InputArgs [])
+    (('-':_):_ ) -> Just (Nothing, InputArgs args)
+    (s1     :sR) -> Just (Just s1, InputArgs sR)
+
+-- | Like 'addParamStrings' but does not match strings starting with a dash.
+-- This prevents misinterpretation of flags as params.
+addParamNoFlagStrings
+  :: forall f out
+   . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out [String]
+addParamNoFlagStrings name par = addCmdPartManyInp ManyUpperBoundN desc parseF
+ where
+  desc :: PartDesc
+  desc = (maybe id PartWithHelp $ _param_help par) $ PartVariable name
+  parseF :: Input -> Maybe (String, Input)
+  parseF (InputString str) =
+    case break Char.isSpace $ dropWhile Char.isSpace str of
+      (""   , _   ) -> Nothing
+      ('-':_, _   ) -> Nothing
+      (x    , rest) -> Just (x, InputString rest)
+  parseF (InputArgs args) = case args of
+    []           -> Nothing
+    (('-':_):_ ) -> Nothing
+    (s1     :sR) -> Just (s1, InputArgs sR)
+
+
 -- | Add a parameter that consumes _all_ remaining input. Typical usecase is
 -- after a "--" as common in certain (unix?) commandline tools.
+addParamRestOfInput
+  :: forall f out . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out String
+addParamRestOfInput = addRestOfInputStringParam
+{-# DEPRECATED addRestOfInputStringParam "use 'addParamRestOfInput'" #-}
 addRestOfInputStringParam
   :: forall f out . (Applicative f)
   => String

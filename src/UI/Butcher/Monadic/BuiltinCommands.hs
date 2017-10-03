@@ -31,7 +31,7 @@ import           System.IO
 -- 'UI.Butcher.Monadic.IO.mainFromCmdParserWithHelpDesc'.
 addHelpCommand :: Applicative f => CommandDesc () -> CmdParser f (IO ()) ()
 addHelpCommand desc = addCmd "help" $ do
-  rest <- addRestOfInputStringParam "SUBCOMMAND(s)" mempty
+  rest <- addParamRestOfInput "SUBCOMMAND(s)" mempty
   addCmdImpl $ do
     let parentDesc = maybe undefined snd (_cmd_mParent desc)
     let restWords  = List.words rest
@@ -54,7 +54,7 @@ addHelpCommand desc = addCmd "help" $ do
 addHelpCommandShallow :: Applicative f => CmdParser f (IO ()) ()
 addHelpCommandShallow = addCmd "help" $ do
   desc <- peekCmdDesc
-  _rest <- addRestOfInputStringParam "SUBCOMMAND(s)" mempty
+  _rest <- addParamRestOfInput "SUBCOMMAND(s)" mempty
   addCmdImpl $ do
     let parentDesc = maybe undefined snd (_cmd_mParent desc)
     print $ ppHelpShallow $ parentDesc

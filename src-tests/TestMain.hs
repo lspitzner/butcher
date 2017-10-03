@@ -103,13 +103,20 @@ simpleRunTest = do
     it "flag 6" $ testRun testCmd5 "abc -f" `shouldSatisfy` Data.Either.isLeft
     it "flag 6" $ testRun testCmd5 "abc -flag 0" `shouldSatisfy` Data.Either.isLeft
     it "flag 6" $ testRun testCmd5 "abc --f 0" `shouldSatisfy` Data.Either.isLeft
-  describe "addStringParams" $ do
+  describe "addParamStrings" $ do
     it "case 1" $ testRun' testCmd6 "" `shouldBe` Right (Just ([], 0))
     it "case 2" $ testRun' testCmd6 "-f" `shouldBe` Right (Just ([], 1))
     it "case 3" $ testRun' testCmd6 "abc" `shouldBe` Right (Just (["abc"], 0))
     it "case 4" $ testRun' testCmd6 "abc def" `shouldBe` Right (Just (["abc", "def"], 0))
     it "case 5" $ testRun' testCmd6 "-g abc def" `shouldBe` Right (Just (["abc", "def"], 2))
     it "case 6" $ testRun' testCmd6 "-f -g def" `shouldBe` Right (Just (["def"], 3))
+  describe "addParamNoFlagStrings" $ do
+    it "case 1" $ testRun' testCmd7 "" `shouldBe` Right (Just ([], 0))
+    it "case 2" $ testRun' testCmd7 "-f" `shouldBe` Right (Just ([], 1))
+    it "case 3" $ testRun' testCmd7 "abc" `shouldBe` Right (Just (["abc"], 0))
+    it "case 4" $ testRun' testCmd7 "abc -f" `shouldBe` Right (Just (["abc"], 1))
+    it "case 5" $ testRun' testCmd7 "-g abc -f" `shouldBe` Right (Just (["abc"], 3))
+    it "case 6" $ testRun' testCmd7 "abc -g def" `shouldBe` Right (Just (["abc", "def"], 2))
 
 
 
@@ -177,7 +184,19 @@ testCmd6 :: CmdParser Identity (WriterS.Writer (Sum Int) [String]) ()
 testCmd6 = do
   f <- addSimpleBoolFlag "f" ["flong"] mempty
   g <- addSimpleBoolFlag "g" ["glong"] mempty
-  args <- addStringParams "ARGS" mempty
+  args <- addParamStrings "ARGS" mempty
+  addCmdImpl $ do
+    when f $ WriterS.tell 1
+    when g $ WriterS.tell 2
+    pure args
+
+testCmd7 :: CmdParser Identity (WriterS.Writer (Sum Int) [String]) ()
+testCmd7 = do
+  reorderStart
+  f <- addSimpleBoolFlag "f" ["flong"] mempty
+  g <- addSimpleBoolFlag "g" ["glong"] mempty
+  args <- addParamNoFlagStrings "ARGS" mempty
+  reorderStop
   addCmdImpl $ do
     when f $ WriterS.tell 1
     when g $ WriterS.tell 2
