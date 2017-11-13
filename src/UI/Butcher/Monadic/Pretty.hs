@@ -56,9 +56,9 @@ import           UI.Butcher.Monadic.Internal.Core
 
 -- | ppUsage exampleDesc yields:
 --
--- > playground [--short] NAME [version | help]
+-- > example [--short] NAME [version | help]
 ppUsage :: CommandDesc a -> PP.Doc
-ppUsage (CommandDesc mParent _help _syn parts out children) = pparents mParent
+ppUsage (CommandDesc mParent _syn _help parts out children) = pparents mParent
   <+> PP.sep [PP.fsep partDocs, subsDoc]
  where
   pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
@@ -79,12 +79,12 @@ ppUsage (CommandDesc mParent _help _syn parts out children) = pparents mParent
 
 -- | ppUsageWithHelp exampleDesc yields:
 --
--- > playground [--short] NAME
--- >            [version | help]: a simple butcher example program
+-- > example [--short] NAME
+-- >         [version | help]: a simple butcher example program
 --
 -- And yes, the line break is not optimal in this instance with default print.
 ppUsageWithHelp :: CommandDesc a -> PP.Doc
-ppUsageWithHelp (CommandDesc mParent help _syn parts out children) =
+ppUsageWithHelp (CommandDesc mParent _syn help parts out children) =
   pparents mParent <+> PP.fsep (partDocs ++ [subsDoc]) PP.<> helpDoc
  where
   pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc

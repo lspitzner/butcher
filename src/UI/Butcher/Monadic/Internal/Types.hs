@@ -104,7 +104,7 @@ type CmdParser f out = Free (CmdParserF f out)
 
 -- | A representation/description of a command parser built via the
 -- 'CmdParser' monad. Can be transformed into a pretty Doc to display
--- as usage/help via 'ppUsage' and related functions.
+-- as usage/help via 'UI.Butcher.Monadic.Pretty.ppUsage' and related functions.
 --
 -- Note that there is the '_cmd_out' accessor that contains @Maybe out@ which
 -- might be useful after successful parsing.
