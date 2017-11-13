@@ -1,5 +1,11 @@
 # Revision history for butcher
 
+## 1.2.1.0  -- November 2017
+
+* Fix bug in 'ppUsageWithHelp'
+* some utilities for interactive usage in new module
+  `UI.Butcher.Monadic.Interactive`
+
 ## 1.2.0.0  -- October 2017
 
 * Rename some `Monadic.Param.*`, deprecate old versions.
