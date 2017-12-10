@@ -31,7 +31,7 @@ checkTests = do
 simpleParseTest :: Spec
 simpleParseTest = do
   it "failed parse 001" $ runCmdParser Nothing (InputString "foo") testCmd1
-         `shouldSatisfy` Data.Either.Combinators.isLeft . snd
+         `shouldSatisfy` Data.Either.isLeft . snd
   it "toplevel" $ (testParse testCmd1 "" >>= _cmd_out)
                   `shouldSatisfy` Maybe.isNothing
   it "hasImpl 001" $ (testParse testCmd1 "abc" >>= _cmd_out)
@@ -50,8 +50,8 @@ simpleRunTest = do
     it "flag 2" $ testRun testCmd1 "abc --flong" `shouldBe` Right (Just 101)
     it "flag 3" $ testRun testCmd1 "abc -f -f" `shouldBe` Right (Just 101)
     it "flag 4" $ testRun testCmd1 "abc -f -g" `shouldBe` Right (Just 103)
-    it "flag 5" $ testRun testCmd1 "abc -f -g -f" `shouldSatisfy` Data.Either.Combinators.isLeft -- no reordering
-    it "flag 6" $ testRun testCmd1 "abc -g -f" `shouldSatisfy` Data.Either.Combinators.isLeft -- no reordering
+    it "flag 5" $ testRun testCmd1 "abc -f -g -f" `shouldSatisfy` Data.Either.isLeft -- no reordering
+    it "flag 6" $ testRun testCmd1 "abc -g -f" `shouldSatisfy` Data.Either.isLeft -- no reordering
     it "flag 7" $ testRun testCmd1 "abc -g -g" `shouldBe` Right (Just 102)
   describe "with reordering" $ do
     it "cmd 1" $ testRun testCmd2 "abc" `shouldBe` Right (Just 100)

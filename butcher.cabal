@@ -50,7 +50,6 @@ library
     , multistate
     , pretty
     , containers
-    , either
     , transformers
     , mtl
     , extra
@@ -113,7 +112,6 @@ test-suite tests
     , multistate
     , pretty
     , containers
-    , either
     , transformers
     , mtl
     , extra

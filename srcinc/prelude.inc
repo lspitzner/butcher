@@ -26,8 +26,6 @@ import qualified System.Info.Extra
 import qualified System.Process.Extra
 import qualified System.Time.Extra
 
-import qualified Data.Either.Combinators
-
 import qualified Control.Monad.Trans.MultiRWS.Lazy
 import qualified Control.Monad.Trans.MultiRWS.Strict
 import qualified Control.Monad.Trans.MultiReader
