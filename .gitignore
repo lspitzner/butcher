@@ -5,7 +5,8 @@
 *.hp
 *.ps
 /*.pdf
-dist
+dist/
+dist-newstyle/
 .cabal-sandbox/
 .stack-work/
 cabal.sandbox.config
