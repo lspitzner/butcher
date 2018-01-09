@@ -58,14 +58,14 @@ import           UI.Butcher.Monadic.Internal.Core
 --
 -- > example [--short] NAME [version | help]
 ppUsage :: CommandDesc a -> PP.Doc
-ppUsage (CommandDesc mParent _syn _help parts out children) = pparents mParent
-  <+> PP.sep [PP.fsep partDocs, subsDoc]
+ppUsage (CommandDesc mParent _syn _help parts out children _hidden) =
+  pparents mParent <+> PP.sep [PP.fsep partDocs, subsDoc]
  where
   pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
   pparents Nothing              = PP.empty
   pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) <+> PP.text n
   pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
-  partDocs = parts <&> ppPartDescUsage
+  partDocs = Maybe.mapMaybe ppPartDescUsage parts
   subsDoc  = case out of
     _ | null children -> PP.empty -- TODO: remove debug
     Nothing | null parts -> subDoc
@@ -75,7 +75,7 @@ ppUsage (CommandDesc mParent _syn _help parts out children) = pparents mParent
     PP.fcat
       $ PP.punctuate (PP.text " | ")
       $ Data.Foldable.toList
-      $ [ PP.text n | (Just n, _) <- children ]
+      $ [ PP.text n | (Just n, c) <- children, _cmd_visibility c == Visible ]
 
 -- | ppUsageWithHelp exampleDesc yields:
 --
@@ -84,14 +84,14 @@ ppUsage (CommandDesc mParent _syn _help parts out children) = pparents mParent
 --
 -- And yes, the line break is not optimal in this instance with default print.
 ppUsageWithHelp :: CommandDesc a -> PP.Doc
-ppUsageWithHelp (CommandDesc mParent _syn help parts out children) =
+ppUsageWithHelp (CommandDesc mParent _syn help parts out children _hidden) =
   pparents mParent <+> PP.fsep (partDocs ++ [subsDoc]) PP.<> helpDoc
  where
   pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
   pparents Nothing              = PP.empty
   pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) <+> PP.text n
   pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
-  partDocs = parts <&> ppPartDescUsage
+  partDocs = Maybe.mapMaybe ppPartDescUsage parts
   subsDoc  = case out of
     _ | null children -> PP.empty -- TODO: remove debug
     Nothing | null parts -> subDoc
@@ -101,7 +101,7 @@ ppUsageWithHelp (CommandDesc mParent _syn help parts out children) =
     PP.fcat
       $ PP.punctuate (PP.text " | ")
       $ Data.Foldable.toList
-      $ [ PP.text n | (Just n, _) <- children ]
+      $ [ PP.text n | (Just n, c) <- children, _cmd_visibility c == Visible ]
   helpDoc = case help of
     Nothing -> PP.empty
     Just h  -> PP.text ":" PP.<+> h
@@ -138,13 +138,14 @@ ppUsageAt strings desc =
 -- >   --short             make the greeting short
 -- >   NAME                your name, so you can be greeted properly
 ppHelpShallow :: CommandDesc a -> PP.Doc
-ppHelpShallow desc@(CommandDesc mParent syn help parts _out _children) =
+ppHelpShallow desc =
   nameSection
     $+$ usageSection
     $+$ descriptionSection
     $+$ partsSection
     $+$ PP.text ""
  where
+  CommandDesc mParent syn help parts _out _children _hidden = desc
   nameSection = case mParent of
     Nothing -> PP.empty
     Just{} ->
@@ -183,24 +184,30 @@ ppHelpShallow desc@(CommandDesc mParent syn help parts _out _children) =
       PartDefault    _ p -> go p
       PartSuggestion _ p -> go p
       PartRedirect s p ->
-        [PP.text s $$ PP.nest 20 (ppPartDescUsage p)] ++ (PP.nest 2 <$> go p)
+        [PP.text s $$ PP.nest 20 (fromMaybe PP.empty $ ppPartDescUsage p)]
+          ++ (PP.nest 2 <$> go p)
       PartReorder ps     -> ps >>= go
       PartMany    p      -> go p
       PartWithHelp doc p -> [ppPartDescHeader p $$ PP.nest 20 doc] ++ go p
+      PartHidden{}       -> []
 
 -- | Internal helper; users probably won't need this.
-ppPartDescUsage :: PartDesc -> PP.Doc
+ppPartDescUsage :: PartDesc -> Maybe PP.Doc
 ppPartDescUsage = \case
-  PartLiteral  s  -> PP.text s
-  PartVariable s  -> PP.text s
-  PartOptional p  -> PP.brackets $ rec p
-  PartAlts     ps -> PP.fcat $ PP.punctuate (PP.text ",") $ rec <$> ps
-  PartSeq      ps -> PP.fsep $ rec <$> ps
-  PartDefault _ p -> PP.brackets $ rec p
-  PartSuggestion s p ->
-    PP.parens $ PP.fcat $ PP.punctuate (PP.text "|") $ fmap PP.text s ++ [rec p]
-  PartRedirect s _ -> PP.text s
-  PartMany p       -> rec p <> PP.text "+"
+  PartLiteral  s -> Just $ PP.text s
+  PartVariable s -> Just $ PP.text s
+  PartOptional p -> PP.brackets <$> rec p
+  PartAlts ps ->
+    [ PP.fcat $ PP.punctuate (PP.text ",") ds
+    | let ds = Maybe.mapMaybe rec ps
+    , not (null ds)
+    ]
+  PartSeq ps -> [ PP.fsep ds | let ds = Maybe.mapMaybe rec ps, not (null ds) ]
+  PartDefault    _ p -> PP.brackets <$> rec p
+  PartSuggestion s p -> rec p <&> \d ->
+    PP.parens $ PP.fcat $ PP.punctuate (PP.text "|") $ fmap PP.text s ++ [d]
+  PartRedirect s _ -> Just $ PP.text s
+  PartMany p       -> rec p <&> (<> PP.text "+")
   PartWithHelp _ p -> rec p
   PartReorder ps ->
     let flags  = [ d | PartMany d <- ps ]
@@ -210,11 +217,12 @@ ppPartDescUsage = \case
             _          -> True
           )
           ps
-    in  PP.sep
-          [(PP.fsep $ PP.brackets . rec <$> flags), PP.fsep (rec <$> params)]
-
- where
-  rec = ppPartDescUsage
+    in  Just $ PP.sep
+          [ (PP.fsep $ PP.brackets <$> Maybe.mapMaybe rec flags)
+          , PP.fsep (Maybe.mapMaybe rec params)
+          ]
+  PartHidden{} -> Nothing
+  where rec = ppPartDescUsage
 
 -- | Internal helper; users probably won't need this.
 ppPartDescHeader :: PartDesc -> PP.Doc
@@ -230,8 +238,8 @@ ppPartDescHeader = \case
   PartWithHelp _ d   -> rec d
   PartSeq     ds     -> PP.hsep $ rec <$> ds
   PartReorder ds     -> PP.vcat $ rec <$> ds
- where
-  rec = ppPartDescHeader
+  PartHidden  d      -> rec d
+  where rec = ppPartDescHeader
 
 -- | Simple conversion from 'ParsingError' to 'String'.
 parsingErrorString :: ParsingError -> String

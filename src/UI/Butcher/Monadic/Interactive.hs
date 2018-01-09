@@ -129,4 +129,5 @@ partDescStrings = \case
   PartReorder xs      -> xs >>= partDescStrings
   PartMany    x       -> partDescStrings x
   PartWithHelp _h x   -> partDescStrings x -- TODO: handle help
+  PartHidden{}        -> []
 

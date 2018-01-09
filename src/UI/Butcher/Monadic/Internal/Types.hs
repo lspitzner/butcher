@@ -13,6 +13,7 @@ module UI.Butcher.Monadic.Internal.Types
   , cmd_parts
   , cmd_out
   , cmd_children
+  , cmd_visibility
   , emptyCommandDesc
   , CmdParserF (..)
   , CmdParser
@@ -21,6 +22,7 @@ module UI.Butcher.Monadic.Internal.Types
   , ParsingError (..)
   , addSuggestion
   , ManyUpperBound (..)
+  , Visibility (..)
   )
 where
 
@@ -57,6 +59,9 @@ data ManyUpperBound
   = ManyUpperBound1
   | ManyUpperBoundN
 
+data Visibility = Visible | Hidden
+  deriving (Show, Eq)
+
 data CmdParserF f out a
   =                          CmdParserHelp PP.Doc a
   |                          CmdParserSynopsis String a
@@ -68,7 +73,7 @@ data CmdParserF f out a
   | forall p . Typeable p => CmdParserPartMany ManyUpperBound PartDesc (String -> Maybe (p, String)) (p -> f ()) ([p] -> a)
   | forall p . Typeable p => CmdParserPartInp PartDesc (Input -> Maybe (p, Input)) (p -> f ()) (p -> a)
   | forall p . Typeable p => CmdParserPartManyInp ManyUpperBound PartDesc (Input -> Maybe (p, Input)) (p -> f ()) ([p] -> a)
-  |                          CmdParserChild (Maybe String) (CmdParser f out ()) (f ()) a
+  |                          CmdParserChild (Maybe String) (CmdParser f out ()) (f ()) Visibility a
   |                          CmdParserImpl  out                                a
   |                          CmdParserReorderStart                             a
   |                          CmdParserReorderStop                              a
@@ -117,6 +122,7 @@ data CommandDesc out = CommandDesc
   , _cmd_children :: Deque (Maybe String, CommandDesc out)
                      -- we don't use a Map here because we'd like to
                      -- retain the order.
+  , _cmd_visibility :: Visibility
   }
 
 -- type PartSeqDesc = [PartDesc]
@@ -140,6 +146,10 @@ data PartDesc
   | PartReorder [PartDesc]
   | PartMany PartDesc
   | PartWithHelp PP.Doc PartDesc
+  | PartHidden PartDesc -- ^ This constructor is currently unused and
+                        -- thus completely untested, even though some
+                        -- of the functions from @Pretty@ module are
+                        -- implemented already.
   deriving Show
 
 addSuggestion :: Maybe [String] -> PartDesc -> PartDesc
@@ -168,7 +178,8 @@ deriving instance Functor CommandDesc
 --
 
 emptyCommandDesc :: CommandDesc out
-emptyCommandDesc = CommandDesc Nothing Nothing Nothing [] Nothing mempty
+emptyCommandDesc =
+  CommandDesc Nothing Nothing Nothing [] Nothing mempty Visible
 
 instance Show (CommandDesc out) where
   show c = "Command help=" ++ show (_cmd_help c)
@@ -208,3 +219,8 @@ LensTH.makeLenses ''PartDesc
 --   show (CmdParserChild s _ _) = "(CmdParserChild " ++ s ++ ")"
 --   show (CmdParserRun _) = "CmdParserRun"
 
+instance Alternative Deque where
+  empty = mempty
+  (<|>) = Deque.prepend
+
+instance MonadPlus Deque
