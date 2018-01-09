@@ -29,19 +29,21 @@ import           System.IO
 -- | Adds a proper full help command. To obtain the 'CommandDesc' value, see
 -- 'UI.Butcher.Monadic.cmdRunParserWithHelpDesc' or
 -- 'UI.Butcher.Monadic.IO.mainFromCmdParserWithHelpDesc'.
-addHelpCommand :: Applicative f => CommandDesc () -> CmdParser f (IO ()) ()
+addHelpCommand :: Applicative f => CommandDesc a -> CmdParser f (IO ()) ()
 addHelpCommand desc = addCmd "help" $ do
   rest <- addParamRestOfInput "SUBCOMMAND(s)" mempty
   addCmdImpl $ do
-    let parentDesc = maybe undefined snd (_cmd_mParent desc)
-    let restWords  = List.words rest
-    let descent :: [String] -> CommandDesc a -> CommandDesc a
-        descent [] curDesc = curDesc
-        descent (w:wr) curDesc =
-          case List.lookup (Just w) $ Data.Foldable.toList $ _cmd_children curDesc of
+    let restWords = List.words rest
+    let
+      descent :: [String] -> CommandDesc a -> CommandDesc a
+      descent [] curDesc = curDesc
+      descent (w:wr) curDesc =
+        case
+            List.lookup (Just w) $ Data.Foldable.toList $ _cmd_children curDesc
+          of
             Nothing    -> curDesc
             Just child -> descent wr child
-    print $ ppHelpShallow $ descent restWords parentDesc
+    print $ ppHelpShallow $ descent restWords desc
 
 -- | Adds a help command that prints help for the command currently in context.
 --
