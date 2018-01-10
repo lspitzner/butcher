@@ -1,6 +1,7 @@
 -- | Some CmdParser actions that add predefined commands.
 module UI.Butcher.Monadic.BuiltinCommands
   ( addHelpCommand
+  , addHelpCommand2
   , addHelpCommandShallow
   , addButcherDebugCommand
   )
@@ -31,6 +32,7 @@ import           System.IO
 -- 'UI.Butcher.Monadic.IO.mainFromCmdParserWithHelpDesc'.
 addHelpCommand :: Applicative f => CommandDesc a -> CmdParser f (IO ()) ()
 addHelpCommand desc = addCmd "help" $ do
+  addCmdSynopsis "print help about this command"
   rest <- addParamRestOfInput "SUBCOMMAND(s)" mempty
   addCmdImpl $ do
     let restWords = List.words rest
@@ -44,6 +46,30 @@ addHelpCommand desc = addCmd "help" $ do
             Nothing    -> curDesc
             Just child -> descent wr child
     print $ ppHelpShallow $ descent restWords desc
+
+-- | Adds a proper full help command. In contrast to 'addHelpCommand',
+-- this version is a bit more verbose about available subcommands as it
+-- includes their synopses.
+--
+-- To obtain the 'CommandDesc' value, see
+-- 'UI.Butcher.Monadic.cmdRunParserWithHelpDesc' or
+-- 'UI.Butcher.Monadic.IO.mainFromCmdParserWithHelpDesc'.
+addHelpCommand2 :: Applicative f => CommandDesc a -> CmdParser f (IO ()) ()
+addHelpCommand2 desc = addCmd "help" $ do
+  addCmdSynopsis "print help about this command"
+  rest <- addParamRestOfInput "SUBCOMMAND(s)" mempty
+  addCmdImpl $ do
+    let restWords = List.words rest
+    let
+      descent :: [String] -> CommandDesc a -> CommandDesc a
+      descent [] curDesc = curDesc
+      descent (w:wr) curDesc =
+        case
+            List.lookup (Just w) $ Data.Foldable.toList $ _cmd_children curDesc
+          of
+            Nothing    -> curDesc
+            Just child -> descent wr child
+    print $ ppHelpDepthOne $ descent restWords desc
 
 -- | Adds a help command that prints help for the command currently in context.
 --
