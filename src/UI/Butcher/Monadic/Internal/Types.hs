@@ -73,7 +73,7 @@ data CmdParserF f out a
   | forall p . Typeable p => CmdParserPartMany ManyUpperBound PartDesc (String -> Maybe (p, String)) (p -> f ()) ([p] -> a)
   | forall p . Typeable p => CmdParserPartInp PartDesc (Input -> Maybe (p, Input)) (p -> f ()) (p -> a)
   | forall p . Typeable p => CmdParserPartManyInp ManyUpperBound PartDesc (Input -> Maybe (p, Input)) (p -> f ()) ([p] -> a)
-  |                          CmdParserChild (Maybe String) (CmdParser f out ()) (f ()) Visibility a
+  |                          CmdParserChild (Maybe String) Visibility (CmdParser f out ()) (f ()) a
   |                          CmdParserImpl  out                                a
   |                          CmdParserReorderStart                             a
   |                          CmdParserReorderStop                              a
@@ -146,10 +146,7 @@ data PartDesc
   | PartReorder [PartDesc]
   | PartMany PartDesc
   | PartWithHelp PP.Doc PartDesc
-  | PartHidden PartDesc -- ^ This constructor is currently unused and
-                        -- thus completely untested, even though some
-                        -- of the functions from @Pretty@ module are
-                        -- implemented already.
+  | PartHidden PartDesc
   deriving Show
 
 addSuggestion :: Maybe [String] -> PartDesc -> PartDesc

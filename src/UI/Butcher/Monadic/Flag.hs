@@ -15,6 +15,7 @@ module UI.Butcher.Monadic.Flag
   , flagHelp
   , flagHelpStr
   , flagDefault
+  , flagHidden
   , addSimpleBoolFlag
   , addSimpleCountFlag
   , addSimpleFlagA
@@ -74,13 +75,19 @@ pOption m = m <|> return ()
 -- | flag-description monoid. You probably won't need to use the constructor;
 -- mzero or any (<>) of flag(Help|Default) works well.
 data Flag p = Flag
-  { _flag_help    :: Maybe PP.Doc
-  , _flag_default :: Maybe p
+  { _flag_help       :: Maybe PP.Doc
+  , _flag_default    :: Maybe p
+  , _flag_visibility :: Visibility
   }
 
 instance Monoid (Flag p) where
-  mempty = Flag Nothing Nothing
-  Flag a1 b1 `mappend` Flag a2 b2 = Flag (a1 <|> a2) (b1 <|> b2)
+  mempty = Flag Nothing Nothing Visible
+  Flag a1 b1 c1 `mappend` Flag a2 b2 c2 = Flag (a1 <|> a2)
+                                               (b1 <|> b2)
+                                               (appVis c1 c2)
+   where
+    appVis Visible Visible = Visible
+    appVis _       _       = Hidden
 
 -- | Create a 'Flag' with just a help text.
 flagHelp :: PP.Doc -> Flag p
@@ -93,6 +100,18 @@ flagHelpStr s = mempty { _flag_help = Just $ PP.text s }
 -- | Create a 'Flag' with just a default value.
 flagDefault :: p -> Flag p
 flagDefault d = mempty { _flag_default = Just d }
+
+-- | Create a 'Flag' marked as hidden. Similar to hidden commands, hidden
+-- flags will not included in pretty-printing (help, usage etc.)
+--
+-- This feature is not well tested yet.
+flagHidden :: Flag p
+flagHidden = mempty { _flag_visibility = Hidden }
+
+wrapHidden :: Flag p -> PartDesc -> PartDesc
+wrapHidden f = case _flag_visibility f of
+  Visible -> id
+  Hidden  -> PartHidden
 
 -- | A no-parameter flag where non-occurence means False, occurence means True.
 addSimpleBoolFlag
@@ -121,7 +140,7 @@ addSimpleBoolFlagAll
   -> f ()
   -> CmdParser f out Bool
 addSimpleBoolFlagAll shorts longs flag a = fmap (not . null)
-  $ addCmdPartManyA ManyUpperBound1 desc parseF (\() -> a)
+  $ addCmdPartManyA ManyUpperBound1 (wrapHidden flag desc) parseF (\() -> a)
  where
   allStrs = fmap (\c -> "-" ++ [c]) shorts ++ fmap (\s -> "--" ++ s) longs
   desc :: PartDesc
@@ -148,7 +167,7 @@ addSimpleCountFlag :: Applicative f
                    -> Flag Void -- ^ properties
                    -> CmdParser f out Int
 addSimpleCountFlag shorts longs flag = fmap length
-  $ addCmdPartMany ManyUpperBoundN desc parseF
+  $ addCmdPartMany ManyUpperBoundN (wrapHidden flag desc) parseF
  where
     -- we _could_ allow this to parse repeated short flags, like "-vvv"
     -- (meaning "-v -v -v") correctly.
@@ -179,7 +198,7 @@ addFlagReadParam
   -> Flag p -- ^ properties
   -> CmdParser f out p
 addFlagReadParam shorts longs name flag =
-  addCmdPartInpA desc parseF (\_ -> pure ())
+  addCmdPartInpA (wrapHidden flag desc) parseF (\_ -> pure ())
  where
   allStrs =
     [ Left $ "-" ++ [c] | c <- shorts ] ++ [ Right $ "--" ++ l | l <- longs ]
@@ -261,7 +280,7 @@ addFlagReadParamsAll
      -> CmdParser f out [p]
 addFlagReadParamsAll shorts longs name flag act = addCmdPartManyInpA
   ManyUpperBoundN
-  desc
+  (wrapHidden flag desc)
   parseF
   act
  where
@@ -310,9 +329,8 @@ addFlagStringParam
      -> String -- ^ param name
      -> Flag String -- ^ properties
      -> CmdParser f out String
-addFlagStringParam shorts longs name flag = addCmdPartInpA desc
-                                                           parseF
-                                                           (\_ -> pure ())
+addFlagStringParam shorts longs name flag =
+  addCmdPartInpA (wrapHidden flag desc) parseF (\_ -> pure ())
  where
   allStrs =
     [ Left $ "-" ++ [c] | c <- shorts ] ++ [ Right $ "--" ++ l | l <- longs ]
@@ -389,7 +407,7 @@ addFlagStringParamsAll
      -> CmdParser f out [String]
 addFlagStringParamsAll shorts longs name flag act = addCmdPartManyInpA
   ManyUpperBoundN
-  desc
+  (wrapHidden flag desc)
   parseF
   act
  where
