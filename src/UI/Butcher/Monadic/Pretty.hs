@@ -28,8 +28,10 @@
 -- >       else putStrLn $ "hello, " ++ name ++ ", welcome from butcher!"
 module UI.Butcher.Monadic.Pretty
   ( ppUsage
+  , ppUsageShortSub
   , ppUsageAt
   , ppHelpShallow
+  , ppHelpDepthOne
   , ppUsageWithHelp
   , ppPartDescUsage
   , ppPartDescHeader
@@ -66,8 +68,10 @@ ppUsage (CommandDesc mParent _syn _help parts out children _hidden) =
   pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) <+> PP.text n
   pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
   partDocs = Maybe.mapMaybe ppPartDescUsage parts
-  subsDoc  = case out of
-    _ | null children -> PP.empty -- TODO: remove debug
+  visibleChildren =
+    [ (n, c) | (Just n, c) <- children, _cmd_visibility c == Visible ]
+  subsDoc = case out of
+    _ | null visibleChildren -> PP.empty
     Nothing | null parts -> subDoc
             | otherwise  -> PP.parens $ subDoc
     Just{} -> PP.brackets $ subDoc
@@ -75,7 +79,30 @@ ppUsage (CommandDesc mParent _syn _help parts out children _hidden) =
     PP.fcat
       $ PP.punctuate (PP.text " | ")
       $ Data.Foldable.toList
-      $ [ PP.text n | (Just n, c) <- children, _cmd_visibility c == Visible ]
+      $ (PP.text . fst) <$> visibleChildren
+
+-- | ppUsageShortSub exampleDesc yields:
+--
+-- > example [--short] NAME <command>
+--
+-- I.e. Subcommands are abbreviated using the @<command>@ label, instead
+-- of being listed.
+ppUsageShortSub :: CommandDesc a -> PP.Doc
+ppUsageShortSub (CommandDesc mParent _syn _help parts out children _hidden) =
+  pparents mParent <+> PP.sep [PP.fsep partDocs, subsDoc]
+ where
+  pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
+  pparents Nothing              = PP.empty
+  pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) <+> PP.text n
+  pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
+  partDocs = Maybe.mapMaybe ppPartDescUsage parts
+  visibleChildren =
+    [ (n, c) | (Just n, c) <- children, _cmd_visibility c == Visible ]
+  subsDoc = case out of
+    _ | null visibleChildren -> PP.empty
+    Nothing                  -> subDoc
+    Just{}                   -> PP.brackets $ subDoc
+  subDoc = if null visibleChildren then PP.empty else PP.text "<command>"
 
 -- | ppUsageWithHelp exampleDesc yields:
 --
@@ -119,7 +146,7 @@ ppUsageAt strings desc =
     [] -> Just $ ppUsage desc
     (s:sr) -> find ((Just s==) . fst) (_cmd_children desc) >>= ppUsageAt sr . snd
 
--- | ppHelpShalloe exampleDesc yields:
+-- | ppHelpShallow exampleDesc yields:
 --
 -- > NAME
 -- > 
@@ -167,6 +194,94 @@ ppHelpShallow desc =
     Nothing -> PP.empty
     Just h ->
       PP.text "" $+$ PP.text "DESCRIPTION" $+$ PP.text "" $+$ PP.nest 2 h
+  partsSection = if null partsTuples
+    then PP.empty
+    else PP.text "" $+$ PP.text "ARGUMENTS" $+$ PP.text "" $+$ PP.nest
+      2
+      (PP.vcat partsTuples)
+  partsTuples :: [PP.Doc]
+  partsTuples = parts >>= go
+   where
+    go = \case
+      PartLiteral{}      -> []
+      PartVariable{}     -> []
+      PartOptional p     -> go p
+      PartAlts     ps    -> ps >>= go
+      PartSeq      ps    -> ps >>= go
+      PartDefault    _ p -> go p
+      PartSuggestion _ p -> go p
+      PartRedirect s p ->
+        [PP.text s $$ PP.nest 20 (fromMaybe PP.empty $ ppPartDescUsage p)]
+          ++ (PP.nest 2 <$> go p)
+      PartReorder ps     -> ps >>= go
+      PartMany    p      -> go p
+      PartWithHelp doc p -> [ppPartDescHeader p $$ PP.nest 20 doc] ++ go p
+      PartHidden{}       -> []
+
+-- | ppHelpDepthOne exampleDesc yields:
+--
+-- > NAME
+-- > 
+-- >   example - a simple butcher example program
+-- > 
+-- > USAGE
+-- > 
+-- >   example [--short] NAME <command>
+-- > 
+-- > DESCRIPTION
+-- > 
+-- >   a very long help document
+-- > 
+-- > COMMANDS
+-- > 
+-- >   version
+-- >   help
+-- > 
+-- > ARGUMENTS
+-- > 
+-- >   --short             make the greeting short
+-- >   NAME                your name, so you can be greeted properly
+ppHelpDepthOne :: CommandDesc a -> PP.Doc
+ppHelpDepthOne desc =
+  nameSection
+    $+$ usageSection
+    $+$ descriptionSection
+    $+$ commandSection
+    $+$ partsSection
+    $+$ PP.text ""
+ where
+  CommandDesc mParent syn help parts _out children _hidden = desc
+  nameSection = case mParent of
+    Nothing -> PP.empty
+    Just{} ->
+      PP.text "NAME"
+        $+$ PP.text ""
+        $+$ PP.nest
+              2
+              ( case syn of
+                Nothing -> pparents mParent
+                Just s  -> pparents mParent <+> PP.text "-" <+> s
+              )
+        $+$ PP.text ""
+  pparents :: Maybe (Maybe String, CommandDesc out) -> PP.Doc
+  pparents Nothing              = PP.empty
+  pparents (Just (Just n , cd)) = pparents (_cmd_mParent cd) PP.<+> PP.text n
+  pparents (Just (Nothing, cd)) = pparents (_cmd_mParent cd)
+  usageSection =
+    PP.text "USAGE" $+$ PP.text "" $+$ PP.nest 2 (ppUsageShortSub desc)
+  descriptionSection = case help of
+    Nothing -> PP.empty
+    Just h ->
+      PP.text "" $+$ PP.text "DESCRIPTION" $+$ PP.text "" $+$ PP.nest 2 h
+  visibleChildren =
+    [ (n, c) | (Just n, c) <- children, _cmd_visibility c == Visible ]
+  childDescs = visibleChildren <&> \(n, c) ->
+    PP.text n $$ PP.nest 20 (fromMaybe PP.empty (_cmd_synopsis c))
+  commandSection = if null visibleChildren
+    then PP.empty
+    else PP.text "" $+$ PP.text "COMMANDS" $+$ PP.text "" $+$ PP.nest
+      2
+      (PP.vcat $ Data.Foldable.toList childDescs)
   partsSection = if null partsTuples
     then PP.empty
     else PP.text "" $+$ PP.text "ARGUMENTS" $+$ PP.text "" $+$ PP.nest
