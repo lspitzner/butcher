@@ -9,6 +9,8 @@ module UI.Butcher.Monadic.Param
   , paramHelpStr
   , paramDefault
   , paramSuggestions
+  , paramFile
+  , paramDirectory
   , addParamRead
   , addParamReadOpt
   , addParamString
@@ -18,6 +20,7 @@ module UI.Butcher.Monadic.Param
   , addParamNoFlagStringOpt
   , addParamNoFlagStrings
   , addParamRestOfInput
+  , addParamRestOfInputRaw
   , -- * Deprecated for more consistent naming
     addReadParam
   , addReadParamOpt
@@ -49,7 +52,7 @@ import           UI.Butcher.Monadic.Internal.Core
 data Param p = Param
   { _param_default :: Maybe p
   , _param_help :: Maybe PP.Doc
-  , _param_suggestions :: Maybe [p]
+  , _param_suggestions :: Maybe [CompletionItem]
   }
 
 instance Monoid (Param p) where
@@ -77,8 +80,17 @@ paramDefault :: p -> Param p
 paramDefault d = mempty { _param_default = Just d }
 
 -- | Create a 'Param' with just a list of suggestion values.
-paramSuggestions :: [p] -> Param p
-paramSuggestions ss = mempty { _param_suggestions = Just ss }
+paramSuggestions :: [String] -> Param p
+paramSuggestions ss =
+  mempty { _param_suggestions = Just $ CompletionString <$> ss }
+
+-- | Create a 'Param' that is a file path.
+paramFile :: Param p
+paramFile = mempty { _param_suggestions = Just [CompletionFile] }
+
+-- | Create a 'Param' that is a directory path.
+paramDirectory :: Param p
+paramDirectory = mempty { _param_suggestions = Just [CompletionDirectory] }
 
 -- | Add a parameter to the 'CmdParser' by making use of a 'Text.Read.Read'
 -- instance. Take care not to use this to return Strings unless you really
@@ -99,7 +111,8 @@ addReadParam :: forall f out a
 addReadParam name par = addCmdPart desc parseF
   where
     desc :: PartDesc
-    desc = (maybe id PartWithHelp $ _param_help par)
+    desc = addSuggestion (_param_suggestions par)
+         $ (maybe id PartWithHelp $ _param_help par)
          $ (maybe id (PartDefault . show) $ _param_default par)
          $ PartVariable name
     parseF :: String -> Maybe (a, String)
@@ -124,7 +137,8 @@ addReadParamOpt :: forall f out a
 addReadParamOpt name par = addCmdPart desc parseF
   where
     desc :: PartDesc
-    desc = PartOptional
+    desc = addSuggestion (_param_suggestions par)
+         $ PartOptional
          $ (maybe id PartWithHelp $ _param_help par)
          $ PartVariable name
     parseF :: String -> Maybe (Maybe a, String)
@@ -180,7 +194,8 @@ addStringParamOpt
 addStringParamOpt name par = addCmdPartInp desc parseF
   where
     desc :: PartDesc
-    desc = PartOptional
+    desc = addSuggestion (_param_suggestions par)
+         $ PartOptional
          $ (maybe id PartWithHelp $ _param_help par)
          $ PartVariable name
     parseF :: Input -> Maybe (Maybe String, Input)
@@ -213,7 +228,10 @@ addStringParams
 addStringParams name par = addCmdPartManyInp ManyUpperBoundN desc parseF
  where
   desc :: PartDesc
-  desc = (maybe id PartWithHelp $ _param_help par) $ PartVariable name
+  desc =
+    addSuggestion (_param_suggestions par)
+      $ (maybe id PartWithHelp $ _param_help par)
+      $ PartVariable name
   parseF :: Input -> Maybe (String, Input)
   parseF (InputString str) =
     case break Char.isSpace $ dropWhile Char.isSpace str of
@@ -284,7 +302,10 @@ addParamNoFlagStrings
 addParamNoFlagStrings name par = addCmdPartManyInp ManyUpperBoundN desc parseF
  where
   desc :: PartDesc
-  desc = (maybe id PartWithHelp $ _param_help par) $ PartVariable name
+  desc =
+    addSuggestion (_param_suggestions par)
+      $ (maybe id PartWithHelp $ _param_help par)
+      $ PartVariable name
   parseF :: Input -> Maybe (String, Input)
   parseF (InputString str) =
     case break Char.isSpace $ dropWhile Char.isSpace str of
@@ -307,15 +328,38 @@ addParamRestOfInput
 addParamRestOfInput = addRestOfInputStringParam
 {-# DEPRECATED addRestOfInputStringParam "use 'addParamRestOfInput'" #-}
 addRestOfInputStringParam
-  :: forall f out . (Applicative f)
+  :: forall f out
+   . (Applicative f)
   => String
   -> Param Void
   -> CmdParser f out String
 addRestOfInputStringParam name par = addCmdPartInp desc parseF
-  where
-    desc :: PartDesc
-    desc = (maybe id PartWithHelp $ _param_help par)
-         $ PartVariable name
-    parseF :: Input -> Maybe (String, Input)
-    parseF (InputString str) = Just (str, InputString "")
-    parseF (InputArgs args)  = Just (List.unwords args, InputArgs [])
+ where
+  desc :: PartDesc
+  desc =
+    addSuggestion (_param_suggestions par)
+      $ (maybe id PartWithHelp $ _param_help par)
+      $ PartVariable name
+  parseF :: Input -> Maybe (String, Input)
+  parseF (InputString str ) = Just (str, InputString "")
+  parseF (InputArgs   args) = Just (List.unwords args, InputArgs [])
+
+
+-- | Add a parameter that consumes _all_ remaining input, returning a raw
+-- 'Input' value.
+addParamRestOfInputRaw
+  :: forall f out . (Applicative f)
+  => String
+  -> Param Void
+  -> CmdParser f out Input
+addParamRestOfInputRaw name par = addCmdPartInp desc parseF
+ where
+  desc :: PartDesc
+  desc =
+    addSuggestion (_param_suggestions par)
+      $ (maybe id PartWithHelp $ _param_help par)
+      $ PartVariable name
+  parseF :: Input -> Maybe (Input, Input)
+  parseF i@InputString{} = Just (i, InputString "")
+  parseF i@InputArgs{}   = Just (i, InputArgs [])
+

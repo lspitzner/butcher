@@ -318,9 +318,13 @@ ppPartDescUsage = \case
     , not (null ds)
     ]
   PartSeq ps -> [ PP.fsep ds | let ds = Maybe.mapMaybe rec ps, not (null ds) ]
-  PartDefault    _ p -> PP.brackets <$> rec p
-  PartSuggestion s p -> rec p <&> \d ->
-    PP.parens $ PP.fcat $ PP.punctuate (PP.text "|") $ fmap PP.text s ++ [d]
+  PartDefault    _   p -> PP.brackets <$> rec p
+  PartSuggestion sgs p -> rec p <&> \d ->
+    PP.parens
+      $  PP.fcat
+      $  PP.punctuate (PP.text "|")
+      $  [ PP.text s | CompletionString s <- sgs ]
+      ++ [d]
   PartRedirect s _ -> Just $ PP.text s
   PartMany p       -> rec p <&> (<> PP.text "+")
   PartWithHelp _ p -> rec p

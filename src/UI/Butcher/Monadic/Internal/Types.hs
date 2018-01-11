@@ -23,6 +23,7 @@ module UI.Butcher.Monadic.Internal.Types
   , addSuggestion
   , ManyUpperBound (..)
   , Visibility (..)
+  , CompletionItem (..)
   )
 where
 
@@ -140,7 +141,7 @@ data PartDesc
   | PartSeq [PartDesc]
   | PartDefault String -- default representation
                 PartDesc
-  | PartSuggestion [String] PartDesc
+  | PartSuggestion [CompletionItem] PartDesc
   | PartRedirect String -- name for the redirection
                  PartDesc
   | PartReorder [PartDesc]
@@ -149,9 +150,17 @@ data PartDesc
   | PartHidden PartDesc
   deriving Show
 
-addSuggestion :: Maybe [String] -> PartDesc -> PartDesc
+addSuggestion :: Maybe [CompletionItem] -> PartDesc -> PartDesc
 addSuggestion Nothing     = id
 addSuggestion (Just sugs) = PartSuggestion sugs
+
+
+data CompletionItem
+  = CompletionString String
+  | CompletionDirectory
+  | CompletionFile
+  deriving Show
+
 
 {-
 command documentation structure
@@ -174,6 +183,7 @@ deriving instance Functor CommandDesc
 
 --
 
+-- | Empty 'CommandDesc' value. Mostly for butcher-internal usage.
 emptyCommandDesc :: CommandDesc out
 emptyCommandDesc =
   CommandDesc Nothing Nothing Nothing [] Nothing mempty Visible

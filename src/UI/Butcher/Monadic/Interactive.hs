@@ -2,6 +2,7 @@
 -- e.g. a REPL.
 module UI.Butcher.Monadic.Interactive
   ( simpleCompletion
+  , shellCompletionWords
   , interactiveHelpDoc
   , partDescStrings
   )
@@ -53,6 +54,39 @@ simpleCompletion line cdesc pcRest =
     , [ s
       | s <- partDescStrings =<< _cmd_parts nameDesc
       , lastWord `isPrefixOf` s
+      ]
+    ]
+
+
+-- | Derives a list of completion items from a given input string and a given
+-- 'CommandDesc'. Considers potential subcommands and where available the
+-- completion info present in 'PartDesc's.
+--
+-- See 'addShellCompletion' which uses this.
+shellCompletionWords
+  :: String         -- ^ input string
+  -> CommandDesc () -- ^ CommandDesc obtained on that input string
+  -> String         -- ^ "remaining" input after the last successfully parsed
+                    -- subcommand. See 'UI.Butcher.Monadic.runCmdParserExt'.
+  -> [CompletionItem]
+shellCompletionWords line cdesc pcRest = choices
+ where
+  _nameDesc = case _cmd_mParent cdesc of
+    Nothing                        -> cdesc
+    Just (_, parent) | null pcRest -> parent
+    Just{}                         -> cdesc
+  lastWord = reverse $ takeWhile (not . Char.isSpace) $ reverse $ line
+  choices :: [CompletionItem]
+  choices = join
+    [ [ CompletionString r
+      | (Just r, _) <- Data.Foldable.toList (_cmd_children cdesc)
+      , lastWord `isPrefixOf` r
+      ]
+    , [ c
+      | c <- partDescCompletions =<< _cmd_parts cdesc
+      , case c of
+        CompletionString s -> lastWord `isPrefixOf` s
+        _                  -> True
       ]
     ]
 
@@ -124,10 +158,32 @@ partDescStrings = \case
   PartSeq      []     -> []
   PartSeq      (x:_)  -> partDescStrings x
   PartDefault    _  x -> partDescStrings x
-  PartSuggestion ss x -> [ s | s <- ss ] ++ partDescStrings x
+  PartSuggestion ss x -> [ s | CompletionString s <- ss ] ++ partDescStrings x
   PartRedirect   _  x -> partDescStrings x
   PartReorder xs      -> xs >>= partDescStrings
   PartMany    x       -> partDescStrings x
   PartWithHelp _h x   -> partDescStrings x -- TODO: handle help
   PartHidden{}        -> []
 
+
+-- | Obtains a list of "expected"/potential strings for a command part
+-- described in the 'PartDesc'. In constrast to the 'simpleCompletion'
+-- function this function does not take into account any current input, and
+-- consequently the output elements can in general not be appended to partial
+-- input to form valid input.
+partDescCompletions :: PartDesc -> [CompletionItem]
+partDescCompletions = \case
+  PartLiteral  s      -> [CompletionString s]
+  PartVariable _      -> []
+  -- TODO: we could handle seq of optional and such much better
+  PartOptional x      -> partDescCompletions x
+  PartAlts     alts   -> alts >>= partDescCompletions
+  PartSeq      []     -> []
+  PartSeq      (x:_)  -> partDescCompletions x
+  PartDefault    _  x -> partDescCompletions x
+  PartSuggestion ss x -> ss ++ partDescCompletions x
+  PartRedirect   _  x -> partDescCompletions x
+  PartReorder xs      -> xs >>= partDescCompletions
+  PartMany    x       -> partDescCompletions x
+  PartWithHelp _h x   -> partDescCompletions x -- TODO: handle help
+  PartHidden{}        -> []

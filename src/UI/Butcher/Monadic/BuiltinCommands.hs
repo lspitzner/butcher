@@ -4,6 +4,8 @@ module UI.Butcher.Monadic.BuiltinCommands
   , addHelpCommand2
   , addHelpCommandShallow
   , addButcherDebugCommand
+  , addShellCompletionCommand
+  , addShellCompletionCommand'
   )
 where
 
@@ -22,6 +24,7 @@ import           UI.Butcher.Monadic.Internal.Types
 import           UI.Butcher.Monadic.Internal.Core
 import           UI.Butcher.Monadic.Pretty
 import           UI.Butcher.Monadic.Param
+import           UI.Butcher.Monadic.Interactive
 
 import           System.IO
 
@@ -93,4 +96,71 @@ addButcherDebugCommand = addCmd "butcherdebug" $ do
   desc <- peekCmdDesc
   addCmdImpl $ do
     print $ maybe undefined snd (_cmd_mParent desc)
+
+-- | Adds the "completion" command and several subcommands.
+--
+-- This command can be used in the following manner:
+--
+-- > $ source <(foo completion bash-script foo)
+addShellCompletionCommand
+  :: CmdParser Identity (IO ()) () -> CmdParser Identity (IO ()) ()
+addShellCompletionCommand mainCmdParser = do
+  addCmdHidden "completion" $ do
+    addCmdSynopsis "utilites to enable bash-completion"
+    addCmd "bash-script" $ do
+      addCmdSynopsis "generate a bash script for completion functionality"
+      exeName <- addParamString "EXENAME" mempty
+      addCmdImpl $ do
+        putStr $ completionScriptBash exeName
+    addCmd "bash-gen" $ do
+      addCmdSynopsis
+        "generate possible completions for given input arguments"
+      rest <- addParamRestOfInputRaw "REALCOMMAND" mempty
+      addCmdImpl $ do
+        let (cdesc, remaining, _result) =
+              runCmdParserExt Nothing rest mainCmdParser
+        let
+          compls = shellCompletionWords (inputString rest)
+                                        cdesc
+                                        (inputString remaining)
+        let lastWord =
+              reverse $ takeWhile (not . Char.isSpace) $ reverse $ inputString
+                rest
+        putStrLn $ List.intercalate "\t" $ compls <&> \case
+          CompletionString s  -> s
+          CompletionFile      -> "$(compgen -f -- " ++ lastWord ++ ")"
+          CompletionDirectory -> "$(compgen -d -- " ++ lastWord ++ ")"
+ where
+  inputString (InputString s ) = s
+  inputString (InputArgs   as) = List.unwords as
+
+-- | Adds the "completion" command and several subcommands
+--
+-- This command can be used in the following manner:
+--
+-- > $ source <(foo completion bash-script foo)
+addShellCompletionCommand'
+  :: (CommandDesc out -> CmdParser Identity (IO ()) ())
+  -> CmdParser Identity (IO ()) ()
+addShellCompletionCommand' f = addShellCompletionCommand (f emptyCommandDesc)
+
+completionScriptBash :: String -> String
+completionScriptBash exeName =
+  List.unlines
+    $ [ "function _" ++ exeName ++ "()"
+      , "{"
+      , "  local IFS=$'\\t'"
+      , "  COMPREPLY=()"
+      , "  local result=$("
+      ++ exeName
+      ++ " completion bash-gen \"${COMP_WORDS[@]:1}\")"
+      , "  for r in ${result[@]}; do"
+      , "    local IFS=$'\\n\\t '"
+      , "    for s in $(eval echo ${r}); do"
+      , "      COMPREPLY+=(${s})"
+      , "    done"
+      , "  done"
+      , "}"
+      , "complete -F _" ++ exeName ++ " " ++ exeName
+      ]
 

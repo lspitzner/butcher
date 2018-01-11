@@ -8,6 +8,7 @@ module UI.Butcher.Monadic.Types
   , Input (..)
   , ParsingError (..)
   , PartDesc(..)
+  , emptyCommandDesc
   )
 where
 

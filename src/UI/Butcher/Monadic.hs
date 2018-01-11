@@ -30,6 +30,8 @@ module UI.Butcher.Monadic
   , addHelpCommand
   , addHelpCommand2
   , addButcherDebugCommand
+  , addShellCompletionCommand
+  , addShellCompletionCommand'
   , mapOut
   )
 where
