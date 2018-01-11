@@ -126,7 +126,7 @@ addShellCompletionCommand mainCmdParser = do
         let lastWord =
               reverse $ takeWhile (not . Char.isSpace) $ reverse $ inputString
                 rest
-        putStrLn $ List.intercalate "\t" $ compls <&> \case
+        putStrLn $ List.unlines $ compls <&> \case
           CompletionString s  -> s
           CompletionFile      -> "$(compgen -f -- " ++ lastWord ++ ")"
           CompletionDirectory -> "$(compgen -d -- " ++ lastWord ++ ")"
@@ -149,13 +149,13 @@ completionScriptBash exeName =
   List.unlines
     $ [ "function _" ++ exeName ++ "()"
       , "{"
-      , "  local IFS=$'\\t'"
+      , "  local IFS=$'\\n'"
       , "  COMPREPLY=()"
       , "  local result=$("
       ++ exeName
       ++ " completion bash-gen \"${COMP_WORDS[@]:1}\")"
       , "  for r in ${result[@]}; do"
-      , "    local IFS=$'\\n\\t '"
+      , "    local IFS=$'\\n '"
       , "    for s in $(eval echo ${r}); do"
       , "      COMPREPLY+=(${s})"
       , "    done"
