@@ -320,11 +320,10 @@ ppPartDescUsage = \case
   PartSeq ps -> [ PP.fsep ds | let ds = Maybe.mapMaybe rec ps, not (null ds) ]
   PartDefault    _   p -> PP.brackets <$> rec p
   PartSuggestion sgs p -> rec p <&> \d ->
-    PP.parens
-      $  PP.fcat
-      $  PP.punctuate (PP.text "|")
-      $  [ PP.text s | CompletionString s <- sgs ]
-      ++ [d]
+    case [ PP.text s | CompletionString s <- sgs ] of
+      [] -> d
+      sgsDocs ->
+        PP.parens $ PP.fcat $ PP.punctuate (PP.text "|") $ sgsDocs ++ [d]
   PartRedirect s _ -> Just $ PP.text s
   PartMany p       -> rec p <&> (<> PP.text "+")
   PartWithHelp _ p -> rec p

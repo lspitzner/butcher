@@ -95,7 +95,8 @@ flagHelp h = mempty { _flag_help = Just h }
 
 -- | Create a 'Flag' with just a help text.
 flagHelpStr :: String -> Flag p
-flagHelpStr s = mempty { _flag_help = Just $ PP.text s }
+flagHelpStr s =
+  mempty { _flag_help = Just $ PP.fsep $ fmap PP.text $ List.words s }
 
 -- | Create a 'Flag' with just a default value.
 flagDefault :: p -> Flag p

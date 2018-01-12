@@ -2,6 +2,7 @@
 module UI.Butcher.Monadic.BuiltinCommands
   ( addHelpCommand
   , addHelpCommand2
+  , addHelpCommandWith
   , addHelpCommandShallow
   , addButcherDebugCommand
   , addShellCompletionCommand
@@ -33,22 +34,12 @@ import           System.IO
 -- | Adds a proper full help command. To obtain the 'CommandDesc' value, see
 -- 'UI.Butcher.Monadic.cmdRunParserWithHelpDesc' or
 -- 'UI.Butcher.Monadic.IO.mainFromCmdParserWithHelpDesc'.
+--
+-- > addHelpCommand = addHelpCommandWith
+-- >   (pure . PP.renderStyle PP.style { PP.ribbonsPerLine = 1.0 } . ppHelpShallow)
 addHelpCommand :: Applicative f => CommandDesc a -> CmdParser f (IO ()) ()
-addHelpCommand desc = addCmd "help" $ do
-  addCmdSynopsis "print help about this command"
-  rest <- addParamRestOfInput "SUBCOMMAND(s)" mempty
-  addCmdImpl $ do
-    let restWords = List.words rest
-    let
-      descent :: [String] -> CommandDesc a -> CommandDesc a
-      descent [] curDesc = curDesc
-      descent (w:wr) curDesc =
-        case
-            List.lookup (Just w) $ Data.Foldable.toList $ _cmd_children curDesc
-          of
-            Nothing    -> curDesc
-            Just child -> descent wr child
-    print $ ppHelpShallow $ descent restWords desc
+addHelpCommand = addHelpCommandWith
+  (pure . PP.renderStyle PP.style { PP.ribbonsPerLine = 1.0 } . ppHelpShallow)
 
 -- | Adds a proper full help command. In contrast to 'addHelpCommand',
 -- this version is a bit more verbose about available subcommands as it
@@ -57,8 +48,21 @@ addHelpCommand desc = addCmd "help" $ do
 -- To obtain the 'CommandDesc' value, see
 -- 'UI.Butcher.Monadic.cmdRunParserWithHelpDesc' or
 -- 'UI.Butcher.Monadic.IO.mainFromCmdParserWithHelpDesc'.
+--
+-- > addHelpCommand2 = addHelpCommandWith
+-- >   (pure . PP.renderStyle PP.style { PP.ribbonsPerLine = 1.0 } . ppHelpDepthOne)
 addHelpCommand2 :: Applicative f => CommandDesc a -> CmdParser f (IO ()) ()
-addHelpCommand2 desc = addCmd "help" $ do
+addHelpCommand2 = addHelpCommandWith
+  (pure . PP.renderStyle PP.style { PP.ribbonsPerLine = 1.0 } . ppHelpDepthOne)
+
+-- | Adds a proper full help command, using the specified function to turn
+-- the relevant subcommand's 'CommandDesc' into a String.
+addHelpCommandWith
+  :: Applicative f
+  => (CommandDesc a -> IO String)
+  -> CommandDesc a
+  -> CmdParser f (IO ()) ()
+addHelpCommandWith f desc = addCmd "help" $ do
   addCmdSynopsis "print help about this command"
   rest <- addParamRestOfInput "SUBCOMMAND(s)" mempty
   addCmdImpl $ do
@@ -72,7 +76,8 @@ addHelpCommand2 desc = addCmd "help" $ do
           of
             Nothing    -> curDesc
             Just child -> descent wr child
-    print $ ppHelpDepthOne $ descent restWords desc
+    s <- f $ descent restWords desc
+    putStrLn s
 
 -- | Adds a help command that prints help for the command currently in context.
 --

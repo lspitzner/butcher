@@ -29,6 +29,7 @@ module UI.Butcher.Monadic
     -- * Builtin commands
   , addHelpCommand
   , addHelpCommand2
+  , addHelpCommandWith
   , addButcherDebugCommand
   , addShellCompletionCommand
   , addShellCompletionCommand'

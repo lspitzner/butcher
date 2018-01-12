@@ -349,7 +349,8 @@ checkCmdParser mTopLevel cmdParser =
       processMain next
     Free (CmdParserSynopsis s next) -> do
       cmd :: CommandDesc out <- mGet
-      mSet $ cmd { _cmd_synopsis = Just $ PP.text s }
+      mSet
+        $ cmd { _cmd_synopsis = Just $ PP.fsep $ fmap PP.text $ List.words s }
       processMain next
     Free (CmdParserPeekDesc nextF) -> do
       processMain $ nextF monadMisuseError
@@ -546,7 +547,8 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
       processMain next
     Free (CmdParserSynopsis s next) -> do
       cmd :: CommandDesc out <- mGet
-      mSet $ cmd { _cmd_synopsis = Just $ PP.text s }
+      mSet
+        $ cmd { _cmd_synopsis = Just $ PP.fsep $ fmap PP.text $ List.words s }
       processMain next
     Free (CmdParserPeekDesc nextF) -> do
       parser                    <- mGet
@@ -1017,7 +1019,8 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
       next
     CmdParserSynopsis s next -> do
       cmd :: CommandDesc out <- mGet
-      mSet $ cmd { _cmd_synopsis = Just $ PP.text s }
+      mSet
+        $ cmd { _cmd_synopsis = Just $ PP.fsep $ fmap PP.text $ List.words s }
       next
     CmdParserPeekDesc nextF -> do
       mGet >>= nextF . fmap (\(_ :: out) -> ())
