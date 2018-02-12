@@ -30,30 +30,32 @@ simpleCompletion
                     -- subcommand. See 'UI.Butcher.Monadic.runCmdParserExt'.
   -> String         -- ^ completion, i.e. a string that might be appended
                     -- to the current prompt when user presses tab.
-simpleCompletion line cdesc pcRest =
-  List.drop (List.length lastWord) $ case choices of
-    [] -> ""
-    (c1:cr) ->
-      case
-          filter (\s -> List.all (s`isPrefixOf`) cr) $ reverse $ List.inits c1
-        of
-          []    -> ""
-          (x:_) -> x
+simpleCompletion line cdesc pcRest = List.drop (List.length lastWord)
+  $ longestCommonPrefix choices
  where
+  longestCommonPrefix [] = ""
+  longestCommonPrefix (c1:cr) =
+    case find (\s -> List.all (s `isPrefixOf`) cr) $ reverse $ List.inits c1 of
+      Nothing -> ""
+      Just x  -> x
   nameDesc = case _cmd_mParent cdesc of
-    Nothing                        -> cdesc
-    Just (_, parent) | null pcRest -> parent
-    Just{}                         -> cdesc
+    Nothing -> cdesc
+    Just (_, parent) | null pcRest && not (null lastWord) -> parent
+        -- not finished writing a command. if we have commands abc and abcdef,
+        -- we may want "def" as a completion after "abc".
+    Just{}  -> cdesc
   lastWord = reverse $ takeWhile (not . Char.isSpace) $ reverse $ line
   choices :: [String]
   choices = join
     [ [ r
       | (Just r, _) <- Data.Foldable.toList (_cmd_children nameDesc)
       , lastWord `isPrefixOf` r
+      , lastWord /= r
       ]
     , [ s
       | s <- partDescStrings =<< _cmd_parts nameDesc
       , lastWord `isPrefixOf` s
+      , lastWord /= s
       ]
     ]
 
@@ -71,21 +73,24 @@ shellCompletionWords
   -> [CompletionItem]
 shellCompletionWords line cdesc pcRest = choices
  where
-  _nameDesc = case _cmd_mParent cdesc of
-    Nothing                        -> cdesc
-    Just (_, parent) | null pcRest -> parent
-    Just{}                         -> cdesc
+  nameDesc = case _cmd_mParent cdesc of
+    Nothing -> cdesc
+    Just (_, parent) | null pcRest && not (null lastWord) -> parent
+        -- not finished writing a command. if we have commands abc and abcdef,
+        -- we may want "def" as a completion after "abc".
+    Just{}  -> cdesc
   lastWord = reverse $ takeWhile (not . Char.isSpace) $ reverse $ line
   choices :: [CompletionItem]
   choices = join
     [ [ CompletionString r
-      | (Just r, _) <- Data.Foldable.toList (_cmd_children cdesc)
+      | (Just r, _) <- Data.Foldable.toList (_cmd_children nameDesc)
       , lastWord `isPrefixOf` r
+      , lastWord /= r
       ]
     , [ c
       | c <- partDescCompletions =<< _cmd_parts cdesc
       , case c of
-        CompletionString s -> lastWord `isPrefixOf` s
+        CompletionString s -> lastWord `isPrefixOf` s && lastWord /= s
         _                  -> True
       ]
     ]
