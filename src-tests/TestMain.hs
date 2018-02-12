@@ -10,6 +10,7 @@ import Test.Hspec
 
 import UI.Butcher.Monadic
 import UI.Butcher.Monadic.Types
+import UI.Butcher.Monadic.Interactive
 
 
 
@@ -117,6 +118,18 @@ simpleRunTest = do
     it "case 4" $ testRun' testCmd7 "abc -f" `shouldBe` Right (Just (["abc"], 1))
     it "case 5" $ testRun' testCmd7 "-g abc -f" `shouldBe` Right (Just (["abc"], 3))
     it "case 6" $ testRun' testCmd7 "abc -g def" `shouldBe` Right (Just (["abc", "def"], 2))
+  describe "completions" $ do
+    it "case  1" $ testCompletion completionTestCmd "" `shouldBe` ""
+    it "case  2" $ testCompletion completionTestCmd "a" `shouldBe` "bc"
+    it "case  3" $ testCompletion completionTestCmd "abc" `shouldBe` "def"
+    it "case  4" $ testCompletion completionTestCmd "abc " `shouldBe` "-"
+    it "case  5" $ testCompletion completionTestCmd "abc -" `shouldBe` ""
+    it "case  6" $ testCompletion completionTestCmd "abc --" `shouldBe` "flag"
+    it "case  7" $ testCompletion completionTestCmd "abc -f" `shouldBe` ""
+    it "case  8" $ testCompletion completionTestCmd "abcd" `shouldBe` "ef"
+    it "case  9" $ testCompletion completionTestCmd "gh" `shouldBe` "i"
+    it "case 10" $ testCompletion completionTestCmd "ghi" `shouldBe` ""
+    it "case 11" $ testCompletion completionTestCmd "ghi " `shouldBe` "jkl"
 
 
 
@@ -201,6 +214,23 @@ testCmd7 = do
     when f $ WriterS.tell 1
     when g $ WriterS.tell 2
     pure args
+
+completionTestCmd :: CmdParser Identity () ()
+completionTestCmd = do
+  addCmd "abc" $ do
+    _ <- addSimpleBoolFlag "f" ["flag"] mempty
+    addCmdImpl ()
+  addCmd "abcdef" $ do
+    _ <- addSimpleBoolFlag "f" ["flag"] mempty
+    addCmdImpl ()
+  addCmd "ghi" $ do
+    addCmd "jkl" $ do
+      addCmdImpl ()
+
+testCompletion :: CmdParser Identity a () -> String -> String
+testCompletion p inp = case runCmdParserExt Nothing (InputString inp) p of
+  (cDesc, InputString cRest, _) -> simpleCompletion inp cDesc cRest
+  _ -> error "wut"
 
 
 testParse :: CmdParser Identity out () -> String -> Maybe (CommandDesc out)
