@@ -1,5 +1,13 @@
 # Revision history for butcher
 
+## 1.3.0.0  -- February 2018
+
+* Experimental: Hidden commandparts (do not appear in help)
+* Experimental: Bash completion
+* Add addHelpCommandWith to support user-defined column count
+* Fix help document printing (ribbons)
+* Fix completion behaviour
+
 ## 1.2.1.0  -- November 2017
 
 * Fix bug in 'ppUsageWithHelp'
