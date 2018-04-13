@@ -24,11 +24,6 @@ source-repository head {
   location: https://github.com/lspitzner/butcher.git
 }
 
-flag butcher-dev
-  description: dev options
-  default: False
-  manual: True
-
 library
   exposed-modules:     UI.Butcher.Monadic.Types
                        UI.Butcher.Monadic
@@ -57,10 +52,6 @@ library
     , bifunctors <5.6
     , deque <0.3
     }
-  if flag(butcher-dev) {
-    build-depends:
-      hspec
-  }
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: {
@@ -93,9 +84,6 @@ library
     -fno-warn-unused-imports
     -fno-warn-orphans
   }
-  if flag(butcher-dev) {
-    ghc-options: -O0 -Werror -fprof-auto -fprof-cafs
-  }
   include-dirs:
     srcinc
 
@@ -116,14 +104,8 @@ test-suite tests
     , mtl
     , extra
     , deque
+    , hspec
     }
-  if flag(butcher-dev) {
-    buildable:        True
-    build-depends:
-      hspec
-  } else {
-    buildable:        False
-  }
   ghc-options:      -Wall
   main-is:          TestMain.hs
   other-modules:    
@@ -149,7 +131,3 @@ test-suite tests
     -fno-warn-unused-imports
     -fno-warn-orphans
   }
-  if flag(butcher-dev) {
-    ghc-options: -Werror -fprof-auto -fprof-cafs -O0
-  }
-
