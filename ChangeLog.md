@@ -1,5 +1,10 @@
 # Revision history for butcher
 
+## 1.3.0.1  -- April 2018
+
+* Support ghc-8.4
+* Drop support for ghc<8
+
 ## 1.3.0.0  -- February 2018
 
 * Experimental: Hidden commandparts (do not appear in help)
