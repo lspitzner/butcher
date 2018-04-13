@@ -43,19 +43,19 @@ library
                        UI.Butcher.Monadic.Internal.Core
   build-depends:
     { base >=4.9 && <4.12
-    , free
-    , unsafe
+    , free < 5.1
+    , unsafe < 0.1
     , microlens <0.5
     , microlens-th <0.5
     , multistate >=0.8 && <0.9
-    , pretty
-    , containers
-    , transformers
-    , mtl
-    , extra
-    , void
-    , bifunctors
-    , deque
+    , pretty <1.2
+    , containers <0.6
+    , transformers <0.6
+    , mtl <2.3
+    , extra <1.7
+    , void <0.8
+    , bifunctors <5.6
+    , deque <0.3
     }
   if flag(butcher-dev) {
     build-depends:
