@@ -80,14 +80,20 @@ data Flag p = Flag
   , _flag_visibility :: Visibility
   }
 
+appendFlag :: Flag p -> Flag p -> Flag p
+appendFlag (Flag a1 b1 c1) (Flag a2 b2 c2) = Flag (a1 <|> a2)
+                                                  (b1 <|> b2)
+                                                  (appVis c1 c2)
+ where
+  appVis Visible Visible = Visible
+  appVis _       _       = Hidden
+
+instance Semigroup (Flag p) where
+  (<>) = appendFlag
+
 instance Monoid (Flag p) where
   mempty = Flag Nothing Nothing Visible
-  Flag a1 b1 c1 `mappend` Flag a2 b2 c2 = Flag (a1 <|> a2)
-                                               (b1 <|> b2)
-                                               (appVis c1 c2)
-   where
-    appVis Visible Visible = Visible
-    appVis _       _       = Hidden
+  mappend = appendFlag
 
 -- | Create a 'Flag' with just a help text.
 flagHelp :: PP.Doc -> Flag p

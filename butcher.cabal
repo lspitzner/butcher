@@ -42,12 +42,12 @@ library
   other-modules:       UI.Butcher.Monadic.Internal.Types
                        UI.Butcher.Monadic.Internal.Core
   build-depends:
-    { base >=4.8 && <4.11
+    { base >=4.9 && <4.12
     , free
     , unsafe
     , microlens <0.5
     , microlens-th <0.5
-    , multistate
+    , multistate >=0.8 && <0.9
     , pretty
     , containers
     , transformers
@@ -103,7 +103,7 @@ test-suite tests
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   build-depends:
-    { base >=4.8 && <4.11
+    { base <999
     , butcher
     , free
     , unsafe

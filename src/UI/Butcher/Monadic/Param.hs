@@ -55,17 +55,20 @@ data Param p = Param
   , _param_suggestions :: Maybe [CompletionItem]
   }
 
+appendParam :: Param p -> Param p -> Param p
+appendParam (Param a1 b1 c1) (Param a2 b2 c2) = Param (a1 `f` a2)
+                                                      (b1 `mappend` b2)
+                                                      (c1 `mappend` c2)
+ where
+  f Nothing x = x
+  f x       _ = x
+
+instance Semigroup (Param p) where
+  (<>) = appendParam
+
 instance Monoid (Param p) where
   mempty = Param Nothing Nothing Nothing
-  mappend (Param a1 b1 c1)
-          (Param a2 b2 c2)
-    = Param
-          (a1 `f` a2)
-          (b1 `mappend` b2)
-          (c1 `mappend` c2)
-    where
-      f Nothing x = x
-      f x       _ = x
+  mappend = appendParam
 
 -- | Create a 'Param' with just a help text.
 paramHelpStr :: String -> Param p

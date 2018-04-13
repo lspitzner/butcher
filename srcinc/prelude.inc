@@ -123,6 +123,7 @@ import Data.Void ( Void )
 import System.IO ( IO )
 import Data.Proxy ( Proxy(..) )
 import Data.Sequence ( Seq )
+import Data.Semigroup ( Semigroup(..) )
 
 import Data.Map ( Map )
 import Data.Set ( Set )
@@ -336,8 +337,7 @@ import Debug.Trace                        ( trace
 import Foreign.ForeignPtr                 ( ForeignPtr
                                           )
 
-import Data.Monoid                        ( (<>)
-                                          , mconcat
+import Data.Monoid                        ( mconcat
                                           , Monoid (..)
                                           )
 
@@ -388,6 +388,7 @@ import Data.Tree                          ( Tree(..)
 import Control.Monad.Trans.MultiRWS       ( MonadMultiReader(..)
                                           , MonadMultiWriter(..)
                                           , MonadMultiState(..)
+                                          , MonadMultiGet(..)
                                           )
 
 import Control.Monad.Trans.MultiReader    ( runMultiReaderTNil

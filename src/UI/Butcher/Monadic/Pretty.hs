@@ -325,7 +325,7 @@ ppPartDescUsage = \case
       sgsDocs ->
         PP.parens $ PP.fcat $ PP.punctuate (PP.text "|") $ sgsDocs ++ [d]
   PartRedirect s _ -> Just $ PP.text s
-  PartMany p       -> rec p <&> (<> PP.text "+")
+  PartMany p       -> rec p <&> (PP.<> PP.text "+")
   PartWithHelp _ p -> rec p
   PartReorder ps ->
     let flags  = [ d | PartMany d <- ps ]
