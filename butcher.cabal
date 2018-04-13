@@ -6,7 +6,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Lennart Spitzner
 maintainer:          Lennart Spitzner <hexagoxel@hexagoxel.de>
-copyright:           Copyright (C) 2016-2017 Lennart Spitzner
+copyright:           Copyright (C) 2016-2018 Lennart Spitzner
 category:            UI
 build-type:          Simple
 Stability:           experimental
