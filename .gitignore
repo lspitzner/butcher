@@ -12,3 +12,5 @@ dist-newstyle/
 cabal.sandbox.config
 **/*.gui~
 \#*.gui\#
+cabal.project.local
+.ghc.environment.*
