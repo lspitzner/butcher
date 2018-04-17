@@ -23,6 +23,7 @@ module UI.Butcher.Monadic.Internal.Core
   , addCmdHidden
   , addNullCmd
   , addCmdImpl
+  , addAlternatives
   , reorderStart
   , reorderStop
   , checkCmdParser
@@ -31,6 +32,7 @@ module UI.Butcher.Monadic.Internal.Core
   , runCmdParserA
   , runCmdParserAExt
   , mapOut
+  , varPartDesc
   )
 where
 
@@ -236,6 +238,25 @@ addCmdHidden
 addCmdHidden str sub =
   liftF $ CmdParserChild (Just str) Hidden sub (pure ()) ()
 
+-- | Add a list of sub-parsers one of which will be selected and used based
+-- on the provided predicate function. The input elements consist of:
+-- a) a name used for the command description of the output,
+-- b) a predicate function; the first True predicate determines which element
+--    to apply
+-- c) a CmdParser.
+addAlternatives
+  :: Typeable p
+  => [(String, String -> Bool, CmdParser f out p)]
+  -> CmdParser f out p
+addAlternatives elems = liftF $ CmdParserAlternatives desc alts id
+ where
+  desc = PartAlts $ [PartVariable s | (s, _, _) <- elems]
+  alts = [(a, b) | (_, a, b) <- elems]
+
+-- | Create a simple PartDesc from a string.
+varPartDesc :: String -> PartDesc
+varPartDesc = PartVariable
+
 -- | Add a new nameless child command in the current context. Nameless means
 -- that this command matches the empty input, i.e. will always apply.
 -- This feature is experimental and CommandDesc pretty-printing might not
@@ -334,13 +355,13 @@ checkCmdParser mTopLevel cmdParser =
         <$ desc { _cmd_parts = Data.Foldable.toList descs }
     StackLayer _ _ _ -> Left "unclosed ReorderStart or GroupStart"
   processMain
-    :: CmdParser f out ()
+    :: CmdParser f out a
     -> MultiRWSS.MultiRWST
          '[]
          '[]
          '[CommandDesc out, CmdDescStack]
          (Either String)
-         ()
+         a
   processMain = \case
     Pure x                      -> return x
     Free (CmdParserHelp h next) -> do
@@ -428,6 +449,21 @@ checkCmdParser mTopLevel cmdParser =
       stackCur <- mGet
       mSet $ StackLayer mempty "" stackCur
       processMain next
+    Free (CmdParserAlternatives desc alts nextF) -> do
+      mModify (descStackAdd desc)
+      states <- MultiRWSS.mGetRawS
+      let go
+            :: [(String -> Bool, CmdParser f out p)]
+            -> MultiRWSS.MultiRWST
+                 '[] '[] '[CommandDesc out, CmdDescStack] (Either String) p
+          go [] = lift $ Left $ "Empty alternatives"
+          go [(_, alt)] = processMain alt
+          go ((_, alt1):altr) = do
+            case MultiRWSS.runMultiRWSTNil $ MultiRWSS.withMultiStates states (processMain alt1) of
+              Left{} -> go altr
+              Right (p, states') -> MultiRWSS.mPutRawS states' $> p
+      p <- go alts
+      processMain $ nextF p
 
   monadMisuseError :: a
   monadMisuseError =
@@ -530,7 +566,8 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
     res =
       if null errs' then Right cmd' else Left $ ParsingError errs' inputRest
   processMain
-    :: CmdParser f out ()
+    :: -- forall a
+       CmdParser f out ()
     -> MultiRWSS.MultiRWS
          '[]
          '[[String]]
@@ -540,7 +577,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
            ()]
          (f ())
   processMain = \case
-    Pure ()                     -> return $ pure $ ()
+    Pure ()                     -> return $ pure ()
     Free (CmdParserHelp h next) -> do
       cmd :: CommandDesc out <- mGet
       mSet $ cmd { _cmd_help = Just h }
@@ -551,7 +588,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
         $ cmd { _cmd_synopsis = Just $ PP.fsep $ fmap PP.text $ List.words s }
       processMain next
     Free (CmdParserPeekDesc nextF) -> do
-      parser                    <- mGet
+      parser :: CmdParser f out () <- mGet
       -- partialDesc :: CommandDesc out <- mGet
       -- partialStack :: CmdDescStack <- mGet
       -- run the rest without affecting the actual stack
@@ -813,6 +850,18 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
           actRest <- processMain fr
           return $ acts *> actRest
         else monadMisuseError
+    Free (CmdParserAlternatives desc alts nextF) -> do
+      input :: Input <- mGet
+      case input of
+        InputString str
+          | Just (_, sub) <- find (\(predicate, _sub) -> predicate str) alts ->
+              processMain $ sub >>= nextF
+        InputArgs (str:_)
+          | Just (_, sub) <- find (\(predicate, _sub) -> predicate str) alts ->
+              processMain $ sub >>= nextF
+        _ -> do
+          mTell ["could not parse any of " ++ getPartSeqDescPositionName desc]
+          processMain $ nextF monadMisuseError
 
   reorderPartGather
     :: ( MonadMultiState Int m
@@ -854,6 +903,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
     CmdParserReorderStart{} -> restCase
     CmdParserGrouped{}      -> restCase
     CmdParserGroupEnd{}     -> restCase
+    CmdParserAlternatives{} -> restCase
    where
     restCase = do
       mTell ["Did not find expected ReorderStop after the reordered parts"]
@@ -873,7 +923,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
     Free (CmdParserPeekInput nextF) -> do
       childrenGather $ nextF $ inputToString inputInitial
     Free (CmdParserPeekDesc nextF) -> do
-      parser                    <- mGet
+      parser :: CmdParser f out () <- mGet
       -- partialDesc :: CommandDesc out <- mGet
       -- partialStack :: CmdDescStack <- mGet
       -- run the rest without affecting the actual stack
@@ -1010,8 +1060,8 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
   -- user needs to use check for that purpose instead.
   processCmdShallow
     :: (MonadMultiState (CommandDesc out) m, MonadMultiState CmdDescStack m)
-    => CmdParserF f out (m ())
-    -> m ()
+    => CmdParserF f out (m a)
+    -> m a
   processCmdShallow = \case
     CmdParserHelp h next -> do
       cmd :: CommandDesc out <- mGet
@@ -1062,15 +1112,13 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
     CmdParserGroupEnd next -> do
       stackCur <- mGet
       case stackCur of
-        StackBottom{} -> do
-          return ()
-        StackLayer _descs "" _up -> do
-          return ()
+        StackBottom{} -> pure ()
+        StackLayer _descs "" _up -> pure ()
         StackLayer descs groupName up -> do
           mSet $ descStackAdd
             (PartRedirect groupName (PartSeq (Data.Foldable.toList descs)))
             up
-          next
+      next
     CmdParserReorderStop next -> do
       stackCur <- mGet
       case stackCur of
@@ -1083,6 +1131,10 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
       stackCur <- mGet
       mSet $ StackLayer mempty "" stackCur
       next
+    CmdParserAlternatives _ [] _ -> error "empty alternatives"
+    CmdParserAlternatives desc ((_, alt):_) nextF -> do
+      mModify (descStackAdd desc)
+      nextF =<< iterM processCmdShallow alt
 
   failureCurrentShallowRerun
     :: ( m ~ MultiRWSS.MultiRWST r w s m0
@@ -1093,7 +1145,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
        )
     => m ()
   failureCurrentShallowRerun = do
-    parser                 <- mGet
+    parser :: CmdParser f out () <- mGet
     cmd :: CommandDesc out <-
       MultiRWSS.withMultiStateS emptyCommandDesc
         $ iterM processCmdShallow parser
@@ -1161,7 +1213,7 @@ takeCommandChild key = do
   return r
 
 -- | map over the @out@ type argument
-mapOut :: (outa -> outb) -> CmdParser f outa () -> CmdParser f outb ()
+mapOut :: (outa -> outb) -> CmdParser f outa a -> CmdParser f outb a
 mapOut f = hoistFree $ \case
   CmdParserHelp     doc r     -> CmdParserHelp doc r
   CmdParserSynopsis s   r     -> CmdParserSynopsis s r
@@ -1175,11 +1227,15 @@ mapOut f = hoistFree $ \case
     CmdParserPartManyInp bound desc fp fa fr
   CmdParserChild s vis child act r ->
     CmdParserChild s vis (mapOut f child) act r
-  CmdParserImpl out r     -> CmdParserImpl (f out) r
-  CmdParserReorderStart r -> CmdParserReorderStart r
-  CmdParserReorderStop  r -> CmdParserReorderStop r
-  CmdParserGrouped s r    -> CmdParserGrouped s r
-  CmdParserGroupEnd r     -> CmdParserGroupEnd r
+  CmdParserImpl out r               -> CmdParserImpl (f out) r
+  CmdParserReorderStart r           -> CmdParserReorderStart r
+  CmdParserReorderStop  r           -> CmdParserReorderStop r
+  CmdParserGrouped s r              -> CmdParserGrouped s r
+  CmdParserGroupEnd r               -> CmdParserGroupEnd r
+  CmdParserAlternatives desc alts r -> CmdParserAlternatives
+    desc
+    [ (predicate, mapOut f sub) | (predicate, sub) <- alts ]
+    r
 
 -- cmdActionPartial :: CommandDesc out -> Either String out
 -- cmdActionPartial = maybe (Left err) Right . _cmd_out

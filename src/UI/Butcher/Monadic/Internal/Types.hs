@@ -80,6 +80,7 @@ data CmdParserF f out a
   |                          CmdParserReorderStop                              a
   |                          CmdParserGrouped String                           a
   |                          CmdParserGroupEnd                                 a
+  | forall p . Typeable p => CmdParserAlternatives PartDesc [((String -> Bool), CmdParser f out p)] (p -> a)
 
 -- | The CmdParser monad type. It is a free monad over some functor but users
 -- of butcher don't need to know more than that 'CmdParser' is a 'Monad'.

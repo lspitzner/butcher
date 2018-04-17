@@ -73,7 +73,9 @@ module UI.Butcher.Monadic.Command
   , addCmdPartMany
   , addCmdPartInp
   , addCmdPartManyInp
+  , addAlternatives
   , ManyUpperBound (..)
+  , varPartDesc
   )
 where
 
