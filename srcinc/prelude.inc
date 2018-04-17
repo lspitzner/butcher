@@ -388,7 +388,7 @@ import Data.Tree                          ( Tree(..)
 import Control.Monad.Trans.MultiRWS       ( MonadMultiReader(..)
                                           , MonadMultiWriter(..)
                                           , MonadMultiState(..)
-                                          , MonadMultiGet(..)
+                                          , mGet
                                           )
 
 import Control.Monad.Trans.MultiReader    ( runMultiReaderTNil

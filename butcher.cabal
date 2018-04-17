@@ -1,5 +1,5 @@
 name:                butcher
-version:             1.3.1.0
+version:             1.3.1.1
 synopsis:            Chops a command or program invocation into digestable pieces.
 description:         See the <https://github.com/lspitzner/butcher/blob/master/README.md README> (it is properly formatted on github).
 license:             BSD3
@@ -42,7 +42,7 @@ library
     , unsafe < 0.1
     , microlens <0.5
     , microlens-th <0.5
-    , multistate >=0.8 && <0.9
+    , multistate >=0.7 && <0.9
     , pretty <1.2
     , containers <0.6
     , transformers <0.6

@@ -1,5 +1,9 @@
 # Revision history for butcher
 
+## 1.3.1.1  -- April 2018
+
+* Fixup version bound
+
 ## 1.3.1.0  -- April 2018
 
 * Add/Expose two more functions: addAlternatives and varPartDesc
