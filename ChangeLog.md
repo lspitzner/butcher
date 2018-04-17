@@ -1,5 +1,9 @@
 # Revision history for butcher
 
+## 1.3.1.0  -- April 2018
+
+* Add/Expose two more functions: addAlternatives and varPartDesc
+
 ## 1.3.0.1  -- April 2018
 
 * Support ghc-8.4
