@@ -1,5 +1,4 @@
--- | Main module of the butcher interface. It reexports everything that is
--- exposed in the submodules.
+-- | Reexports of everything that is exposed in the submodules.
 module UI.Butcher.Monadic
   ( -- * Types
     Input (..)
@@ -18,9 +17,11 @@ module UI.Butcher.Monadic
   , -- * Building CmdParsers
     module UI.Butcher.Monadic.Command
     -- * PrettyPrinting CommandDescs (usage/help)
-  , module  UI.Butcher.Monadic.Pretty
+  , module UI.Butcher.Monadic.Pretty
     -- * Wrapper around System.Environment.getArgs
-  , module  UI.Butcher.Monadic.IO
+  , module UI.Butcher.Monadic.IO
+    -- * Utilities for interactive feedback of commandlines (completions etc.)
+  , module UI.Butcher.Monadic.Interactive
   -- , cmds
   -- , sample
   -- , test
@@ -33,7 +34,10 @@ module UI.Butcher.Monadic
   , addButcherDebugCommand
   , addShellCompletionCommand
   , addShellCompletionCommand'
+    -- * Advanced usage
   , mapOut
+  , emptyCommandDesc
+  , Visibility (..)
   )
 where
 
@@ -48,6 +52,7 @@ import UI.Butcher.Monadic.BuiltinCommands
 import UI.Butcher.Monadic.Internal.Core
 import UI.Butcher.Monadic.Pretty
 import UI.Butcher.Monadic.IO
+import UI.Butcher.Monadic.Interactive
 
 import qualified Text.PrettyPrint as PP
 

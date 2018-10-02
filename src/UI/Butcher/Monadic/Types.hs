@@ -9,6 +9,7 @@ module UI.Butcher.Monadic.Types
   , ParsingError (..)
   , PartDesc(..)
   , emptyCommandDesc
+  , Visibility (..)
   )
 where
 
