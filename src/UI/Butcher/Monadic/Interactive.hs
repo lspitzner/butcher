@@ -30,11 +30,18 @@ simpleCompletion
                     -- subcommand. See 'UI.Butcher.Monadic.runCmdParserExt'.
   -> String         -- ^ completion, i.e. a string that might be appended
                     -- to the current prompt when user presses tab.
-simpleCompletion line cdesc pcRest = List.drop (List.length lastWord)
-  $ longestCommonPrefix choices
+simpleCompletion line cdesc pcRest = case reverse line of
+  []              -> compl
+  ' ' : _         -> compl
+  _ | null pcRest -> "" -- necessary to prevent subcommand completion
+                        -- appearing before space that is, if you have command
+                        -- "aaa" with subcommand "sss", we want completion
+                        -- "sss" on "aaa " but not on "aaa".
+  _               -> compl
  where
+  compl = List.drop (List.length lastWord) (longestCommonPrefix choices)
   longestCommonPrefix [] = ""
-  longestCommonPrefix (c1:cr) =
+  longestCommonPrefix (c1 : cr) =
     case find (\s -> List.all (s `isPrefixOf`) cr) $ reverse $ List.inits c1 of
       Nothing -> ""
       Just x  -> x

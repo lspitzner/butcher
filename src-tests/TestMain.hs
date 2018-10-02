@@ -121,7 +121,7 @@ simpleRunTest = do
   describe "completions" $ do
     it "case  1" $ testCompletion completionTestCmd "" `shouldBe` ""
     it "case  2" $ testCompletion completionTestCmd "a" `shouldBe` "bc"
-    it "case  3" $ testCompletion completionTestCmd "abc" `shouldBe` "def"
+    it "case  3" $ testCompletion completionTestCmd "abc" `shouldBe` ""
     it "case  4" $ testCompletion completionTestCmd "abc " `shouldBe` "-"
     it "case  5" $ testCompletion completionTestCmd "abc -" `shouldBe` ""
     it "case  6" $ testCompletion completionTestCmd "abc --" `shouldBe` "flag"
