@@ -1,5 +1,11 @@
 # Revision history for butcher
 
+## 1.3.2.0  -- October 2018
+
+* Fix for simpleCompletion
+* Expose some bindings that were forgotten in previous release
+* Bounds fixed for ghc-8.6 (also via revision in 1.3.1.1)
+
 ## 1.3.1.1  -- April 2018
 
 * Fixup version bound
