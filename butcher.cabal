@@ -37,7 +37,7 @@ library
   other-modules:       UI.Butcher.Monadic.Internal.Types
                        UI.Butcher.Monadic.Internal.Core
   build-depends:
-    { base >=4.9 && <4.13
+    { base >=4.9 && <4.12
     , free < 5.2
     , unsafe < 0.1
     , microlens <0.5
