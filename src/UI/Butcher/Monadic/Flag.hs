@@ -93,7 +93,7 @@ instance Semigroup (Flag p) where
 
 instance Monoid (Flag p) where
   mempty = Flag Nothing Nothing Visible
-  mappend = appendFlag
+  mappend = (<>)
 
 -- | Create a 'Flag' with just a help text.
 flagHelp :: PP.Doc -> Flag p

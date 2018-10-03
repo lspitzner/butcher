@@ -337,8 +337,9 @@ import Debug.Trace                        ( trace
 import Foreign.ForeignPtr                 ( ForeignPtr
                                           )
 
-import Data.Monoid                        ( mconcat
-                                          , Monoid (..)
+import Data.Monoid                        ( Monoid
+                                          , mempty
+                                          , mconcat
                                           )
 
 import Data.Bifunctor                     ( bimap )

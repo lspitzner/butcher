@@ -57,8 +57,8 @@ data Param p = Param
 
 appendParam :: Param p -> Param p -> Param p
 appendParam (Param a1 b1 c1) (Param a2 b2 c2) = Param (a1 `f` a2)
-                                                      (b1 `mappend` b2)
-                                                      (c1 `mappend` c2)
+                                                      (b1 <> b2)
+                                                      (c1 <> c2)
  where
   f Nothing x = x
   f x       _ = x
@@ -68,7 +68,7 @@ instance Semigroup (Param p) where
 
 instance Monoid (Param p) where
   mempty = Param Nothing Nothing Nothing
-  mappend = appendParam
+  mappend = (<>)
 
 -- | Create a 'Param' with just a help text.
 paramHelpStr :: String -> Param p
