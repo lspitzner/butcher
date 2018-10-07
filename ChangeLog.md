@@ -1,5 +1,9 @@
 # Revision history for butcher
 
+## 1.3.2.1  -- October 2018
+
+* Adapt/Use latest version of `deque` to fix ghc-8.6 problems
+
 ## 1.3.2.0  -- October 2018
 
 * Fix for simpleCompletion
