@@ -226,9 +226,3 @@ LensTH.makeLenses ''PartDesc
 --   show (CmdParserParam s _ _) = "(CmdParserParam " ++ s ++ ")"
 --   show (CmdParserChild s _ _) = "(CmdParserChild " ++ s ++ ")"
 --   show (CmdParserRun _) = "CmdParserRun"
-
-instance Alternative Deque where
-  empty = mempty
-  (<|>) = Deque.prepend
-
-instance MonadPlus Deque
