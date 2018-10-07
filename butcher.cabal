@@ -37,7 +37,7 @@ library
   other-modules:       UI.Butcher.Monadic.Internal.Types
                        UI.Butcher.Monadic.Internal.Core
   build-depends:
-    { base >=4.9 && <4.12
+    { base >=4.9 && <4.13
     , free < 5.2
     , unsafe < 0.1
     , microlens <0.5
@@ -80,6 +80,7 @@ library
   }
   ghc-options: {
     -Wall
+    -Wcompat
     -fno-spec-constr
     -fno-warn-unused-imports
     -fno-warn-orphans
