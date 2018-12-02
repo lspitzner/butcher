@@ -732,28 +732,31 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
               Just $ (Just name, child, act, vis, InputArgs strr)
             (Nothing, _) -> Just $ (Nothing, child, act, vis, input)
             _            -> Nothing
+      combined_child_list `forM_` \(child_name, (vis, child, _)) -> do
+        let initialDesc :: CommandDesc out = emptyCommandDesc
+        -- get the shallow desc for the child in a separate env.
+        let (subCmd, subStack) =
+              runIdentity
+                $ MultiRWSS.runMultiRWSTNil
+                $ MultiRWSS.withMultiStateSA initialDesc
+                $ MultiRWSS.withMultiStateS (StackBottom mempty)
+                $ iterM processCmdShallow child
+        cmd_children %=+ Deque.snoc
+          ( child_name
+          , postProcessCmd subStack subCmd { _cmd_visibility = vis }
+          )
       case mRest of
         Nothing -> do -- a child not matching what we have in the input
-          let initialDesc :: CommandDesc out = emptyCommandDesc
           -- get the shallow desc for the child in a separate env.
-          combined_child_list `forM_` \(child_name, (vis, child, _)) -> do
-            let (subCmd, subStack) =
-                  runIdentity
-                    $ MultiRWSS.runMultiRWSTNil
-                    $ MultiRWSS.withMultiStateSA initialDesc
-                    $ MultiRWSS.withMultiStateS (StackBottom mempty)
-                    $ iterM processCmdShallow child
-            cmd_children %=+ Deque.snoc
-              ( child_name
-              , postProcessCmd subStack subCmd { _cmd_visibility = vis }
-              )
           -- proceed regularly on the same layer
           processMain $ restCmdParser
         Just (name, vis, child, act, rest) -> do -- matching child -> descend
           -- process all remaining stuff on the same layer shallowly,
-          -- including the current node. This will be replaced later.
+          -- including the current node. This will walk over the child
+          -- definition(s) again, but that is harmless because we do not
+          -- overwrite them.
           iterM processCmdShallow f
-          -- so the descend
+          -- do the descend
           cmd <- do
             c :: CommandDesc out      <- mGet
             prevStack :: CmdDescStack <- mGet
