@@ -128,7 +128,7 @@ import Data.Semigroup ( Semigroup(..) )
 import Data.Map ( Map )
 import Data.Set ( Set )
 
-#if MIN_VERSION_base(0,4,0)
+#if MIN_VERSION_deque(0,3,0)
 import Deque.Lazy ( Deque )
 
 import qualified Deque.Lazy as Deque
