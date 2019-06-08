@@ -6,7 +6,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Lennart Spitzner
 maintainer:          Lennart Spitzner <hexagoxel@hexagoxel.de>
-copyright:           Copyright (C) 2016-2018 Lennart Spitzner
+copyright:           Copyright (C) 2016-2019 Lennart Spitzner
 category:            UI
 build-type:          Simple
 Stability:           experimental
@@ -50,7 +50,7 @@ library
     , extra <1.7
     , void <0.8
     , bifunctors <5.6
-    , deque >=0.2.4 && <0.3
+    , deque >=0.2.4 && <0.5
     }
   hs-source-dirs:      src
   default-language:    Haskell2010
