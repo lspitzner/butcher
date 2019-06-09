@@ -57,9 +57,9 @@ checks:
   upper-bounds-exist:
     enabled: False
   upper-bounds-stackage:
-    enabled: False
+    enabled: True
     enabled-help: "for existing upper bounds"
-    use-nightly: False
+    use-nightly: True
   upper-bounds-stackage-help: |
     if you are completely unlucky, this might _overwrite_
     an existing cabal.config. if you press ctrl-c in exactly
