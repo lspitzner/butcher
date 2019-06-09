@@ -1,6 +1,10 @@
 # Revision history for butcher
 
-## 1.3.2.2  -- December 2018
+## 1.3.2.3  -- June 2019
+
+* Fix broken build when using deque>=0.3
+
+## 1.3.2.2  -- June 2019 (broken, disabled on hackage)
 
 * Fix too-shallow descriptions on siblings for partial parses returned
   for interactive usage
