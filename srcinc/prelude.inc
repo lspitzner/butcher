@@ -128,9 +128,9 @@ import Data.Semigroup ( Semigroup(..) )
 import Data.Map ( Map )
 import Data.Set ( Set )
 
-import Deque ( Deque )
+import Deque.Lazy ( Deque )
 
-import qualified Deque
+import qualified Deque.Lazy as Deque
 
 import Prelude                            ( Char
                                           , String
