@@ -29,6 +29,8 @@ checks:
         version: "8.4.4"
       - compiler: "ghc"
         version: "8.6.5"
+      - compiler: "ghc"
+        version: "8.8.1"
       # - compiler: "ghc"
       #   version: "8.8.1-alpha1"
     compilers-help: |
