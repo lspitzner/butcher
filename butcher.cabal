@@ -47,7 +47,7 @@ library
     , containers <0.7
     , transformers <0.6
     , mtl <2.3
-    , extra <1.7
+    , extra <1.8
     , void <0.8
     , bifunctors <5.6
     , deque >=0.3 && <0.5
