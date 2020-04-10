@@ -118,6 +118,18 @@ simpleRunTest = do
     it "case 4" $ testRun' testCmd7 "abc -f" `shouldBe` Right (Just (["abc"], 1))
     it "case 5" $ testRun' testCmd7 "-g abc -f" `shouldBe` Right (Just (["abc"], 3))
     it "case 6" $ testRun' testCmd7 "abc -g def" `shouldBe` Right (Just (["abc", "def"], 2))
+  describe "defaultParam" $ do
+    it "case  1" $ testRun testCmdParam "" `shouldSatisfy` Data.Either.isLeft
+    it "case  2" $ testRun testCmdParam "n" `shouldSatisfy` Data.Either.isLeft
+    it "case  3" $ testRun testCmdParam "y" `shouldSatisfy` Data.Either.isLeft
+    it "case  4" $ testRun testCmdParam "False n" `shouldBe` Right (Just 110)
+    it "case  5" $ testRun testCmdParam "False y" `shouldBe` Right (Just 310)
+    it "case  6" $ testRun testCmdParam "True n" `shouldBe` Right (Just 1110)
+    it "case  7" $ testRun testCmdParam "True y" `shouldBe` Right (Just 1310)
+    it "case  8" $ testRun testCmdParam "1 False y" `shouldBe` Right (Just 301)
+    it "case  9" $ testRun testCmdParam "1 False y def" `shouldBe` Right (Just 201)
+    it "case 10" $ testRun testCmdParam "1 False 2 y def" `shouldBe` Right (Just 203)
+    it "case 11" $ testRun testCmdParam "1 True 2 y def" `shouldBe` Right (Just 1203)
   describe "completions" $ do
     it "case  1" $ testCompletion completionTestCmd "" `shouldBe` ""
     it "case  2" $ testCompletion completionTestCmd "a" `shouldBe` "bc"
@@ -214,6 +226,21 @@ testCmd7 = do
     when f $ WriterS.tell 1
     when g $ WriterS.tell 2
     pure args
+
+testCmdParam :: CmdParser Identity (WriterS.Writer (Sum Int) ()) ()
+testCmdParam = do
+  p :: Int <- addParamRead "INT" (paramDefault 10)
+  b <- addParamRead "MANDR" mempty
+  r <- addParamReadOpt "MAY1" (paramDefault 20)
+  s <- addParamString "MAND" mempty
+  q <- addParamString "STR" (paramDefault "abc")
+  addCmdImpl $ do
+    WriterS.tell (Sum p)
+    when (q=="abc") $ WriterS.tell 100
+    r `forM_` (WriterS.tell . Sum)
+    when b $ WriterS.tell $ Sum 1000
+    when (s=="y") $ WriterS.tell 200
+    pure ()
 
 completionTestCmd :: CmdParser Identity () ()
 completionTestCmd = do
