@@ -36,6 +36,7 @@ module UI.Butcher.Monadic.Pretty
   , ppPartDescUsage
   , ppPartDescHeader
   , parsingErrorString
+  , descendDescTo
   )
 where
 
@@ -43,11 +44,16 @@ where
 
 #include "prelude.inc"
 import           Control.Monad.Free
-import qualified Control.Monad.Trans.MultiRWS.Strict as MultiRWSS
-import qualified Control.Monad.Trans.MultiState.Strict as MultiStateS
+import qualified Control.Monad.Trans.MultiRWS.Strict
+                                               as MultiRWSS
+import qualified Control.Monad.Trans.MultiState.Strict
+                                               as MultiStateS
 
-import qualified Text.PrettyPrint as PP
-import           Text.PrettyPrint ( (<+>), ($$), ($+$) )
+import qualified Text.PrettyPrint              as PP
+import           Text.PrettyPrint               ( (<+>)
+                                                , ($$)
+                                                , ($+$)
+                                                )
 
 import           Data.HList.ContainsType
 
@@ -77,9 +83,10 @@ ppUsage (CommandDesc mParent _syn _help parts out children _hidden) =
     Just{} -> PP.brackets $ subDoc
   subDoc =
     PP.fcat
-      $ PP.punctuate (PP.text " | ")
-      $ Data.Foldable.toList
-      $ (PP.text . fst) <$> visibleChildren
+      $   PP.punctuate (PP.text " | ")
+      $   Data.Foldable.toList
+      $   (PP.text . fst)
+      <$> visibleChildren
 
 -- | ppUsageShortSub exampleDesc yields:
 --
@@ -138,13 +145,19 @@ ppUsageWithHelp (CommandDesc mParent _syn help parts out children _hidden) =
 -- fromJust $ ppUsageAt ["version"] exampleDesc yields:
 --
 -- > example version [--porcelain]
-ppUsageAt :: [String] -- (sub)command sequence
-          -> CommandDesc a
-          -> Maybe PP.Doc
-ppUsageAt strings desc =
-  case strings of
-    [] -> Just $ ppUsage desc
-    (s:sr) -> find ((Just s==) . fst) (_cmd_children desc) >>= ppUsageAt sr . snd
+ppUsageAt
+  :: [String] -- (sub)command sequence
+  -> CommandDesc a
+  -> Maybe PP.Doc
+ppUsageAt strings desc = ppUsage <$> descendDescTo strings desc
+
+-- | Access a child command's CommandDesc.
+descendDescTo :: [String] -> CommandDesc a -> Maybe (CommandDesc a)
+descendDescTo strings desc = case strings of
+  [] -> Just desc
+  (s : sr) -> do -- Maybe
+    (_, childDesc) <- find ((Just s ==) . fst) (_cmd_children desc)
+    descendDescTo sr childDesc
 
 -- | ppHelpShallow exampleDesc yields:
 --
@@ -180,7 +193,7 @@ ppHelpShallow desc =
         $+$ PP.text ""
         $+$ PP.nest
               2
-              ( case syn of
+              (case syn of
                 Nothing -> pparents mParent
                 Just s  -> pparents mParent <+> PP.text "-" <+> s
               )
@@ -258,7 +271,7 @@ ppHelpDepthOne desc =
         $+$ PP.text ""
         $+$ PP.nest
               2
-              ( case syn of
+              (case syn of
                 Nothing -> pparents mParent
                 Just s  -> pparents mParent <+> PP.text "-" <+> s
               )
@@ -330,7 +343,7 @@ ppPartDescUsage = \case
   PartReorder ps ->
     let flags  = [ d | PartMany d <- ps ]
         params = filter
-          ( \case
+          (\case
             PartMany{} -> False
             _          -> True
           )
@@ -364,16 +377,16 @@ parsingErrorString :: ParsingError -> String
 parsingErrorString (ParsingError mess remaining) =
   "error parsing arguments: " ++ messStr ++ remainingStr
  where
-  messStr      = case mess of
-    []    -> ""
-    (m:_) -> m ++ " "
+  messStr = case mess of
+    []      -> ""
+    (m : _) -> m ++ " "
   remainingStr = case remaining of
     InputString ""  -> "at the end of input."
     InputString str -> case show str of
       s | length s < 42 -> "at: " ++ s ++ "."
       s                 -> "at: " ++ take 40 s ++ "..\"."
-    InputArgs   []  -> "at the end of input"
-    InputArgs   xs  -> case List.unwords $ show <$> xs of
+    InputArgs [] -> "at the end of input"
+    InputArgs xs -> case List.unwords $ show <$> xs of
       s | length s < 42 -> "at: " ++ s ++ "."
       s                 -> "at: " ++ take 40 s ++ "..\"."
 
