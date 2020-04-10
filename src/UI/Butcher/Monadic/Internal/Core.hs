@@ -625,6 +625,10 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
             mSet $ InputArgs strr
             actRest <- processMain $ nextF x
             return $ actF x *> actRest
+          Just (x, rest) | str == rest -> do
+            -- no input consumed, default applied
+            actRest <- processMain $ nextF x
+            return $ actF x *> actRest
           _ -> do
             mTell ["could not parse " ++ getPartSeqDescPositionName desc]
             processMain $ nextF monadMisuseError
