@@ -235,9 +235,9 @@ addFlagReadParam shorts longs name flag =
     InputArgs (arg1:argR) -> case runInpParseString arg1 parser of
       Just ((), "") -> case argR of
         []          -> Nothing
-        (arg2:rest) -> readMaybe arg2 <&> \x -> (x, InputArgs rest)
+        (arg2:rest) -> Text.Read.readMaybe arg2 <&> \x -> (x, InputArgs rest)
       Just ((), remainingStr) ->
-        readMaybe remainingStr <&> \x -> (x, InputArgs argR)
+        Text.Read.readMaybe remainingStr <&> \x -> (x, InputArgs argR)
       Nothing -> _flag_default flag <&> \d -> (d, inp)
      where
       parser :: InpParseString ()
@@ -316,10 +316,10 @@ addFlagReadParamsAll shorts longs name flag act = addCmdPartManyInpA
     InputArgs (arg1:argR) -> case runInpParseString arg1 parser of
       Just ((), "") -> case argR of
         []          -> mdef
-        (arg2:rest) -> (readMaybe arg2 <&> \x -> (x, InputArgs rest)) <|> mdef
+        (arg2:rest) -> (Text.Read.readMaybe arg2 <&> \x -> (x, InputArgs rest)) <|> mdef
         where mdef = _flag_default flag <&> \p -> (p, InputArgs argR)
       Just ((), remainingStr) ->
-        readMaybe remainingStr <&> \x -> (x, InputArgs argR)
+        Text.Read.readMaybe remainingStr <&> \x -> (x, InputArgs argR)
       Nothing -> Nothing
      where
       parser :: InpParseString ()

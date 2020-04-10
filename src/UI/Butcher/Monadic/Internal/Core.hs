@@ -402,7 +402,7 @@ checkCmdParser mTopLevel cmdParser =
       cmd :: CommandDesc out <- mGet
       subCmd                 <- do
         stackCur :: CmdDescStack <- mGet
-        mSet $ fromMaybe (emptyCommandDesc :: CommandDesc out) mInitialDesc
+        mSet $ Maybe.fromMaybe (emptyCommandDesc :: CommandDesc out) mInitialDesc
         mSet $ StackBottom mempty
         processMain sub
         c          <- mGet
@@ -1102,7 +1102,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
     CmdParserChild cmdStr vis _sub _act next -> do
       mExisting <- takeCommandChild cmdStr
       let childDesc :: CommandDesc out =
-            fromMaybe emptyCommandDesc { _cmd_visibility = vis } mExisting
+            Maybe.fromMaybe emptyCommandDesc { _cmd_visibility = vis } mExisting
       cmd_children %=+ Deque.snoc (cmdStr, childDesc)
       next
     CmdParserImpl out next -> do

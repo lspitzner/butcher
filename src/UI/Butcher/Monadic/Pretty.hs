@@ -211,7 +211,7 @@ ppHelpShallow desc =
       PartDefault    _ p -> go p
       PartSuggestion _ p -> go p
       PartRedirect s p ->
-        [PP.text s $$ PP.nest 20 (fromMaybe PP.empty $ ppPartDescUsage p)]
+        [PP.text s $$ PP.nest 20 (Maybe.fromMaybe PP.empty $ ppPartDescUsage p)]
           ++ (PP.nest 2 <$> go p)
       PartReorder ps     -> ps >>= go
       PartMany    p      -> go p
@@ -276,7 +276,7 @@ ppHelpDepthOne desc =
   visibleChildren =
     [ (n, c) | (Just n, c) <- children, _cmd_visibility c == Visible ]
   childDescs = visibleChildren <&> \(n, c) ->
-    PP.text n $$ PP.nest 20 (fromMaybe PP.empty (_cmd_synopsis c))
+    PP.text n $$ PP.nest 20 (Maybe.fromMaybe PP.empty (_cmd_synopsis c))
   commandSection = if null visibleChildren
     then PP.empty
     else PP.text "" $+$ PP.text "COMMANDS" $+$ PP.text "" $+$ PP.nest
@@ -299,7 +299,7 @@ ppHelpDepthOne desc =
       PartDefault    _ p -> go p
       PartSuggestion _ p -> go p
       PartRedirect s p ->
-        [PP.text s $$ PP.nest 20 (fromMaybe PP.empty $ ppPartDescUsage p)]
+        [PP.text s $$ PP.nest 20 (Maybe.fromMaybe PP.empty $ ppPartDescUsage p)]
           ++ (PP.nest 2 <$> go p)
       PartReorder ps     -> ps >>= go
       PartMany    p      -> go p
