@@ -1,12 +1,12 @@
 name:                butcher
-version:             1.3.2.3
+version:             1.3.3.0
 synopsis:            Chops a command or program invocation into digestable pieces.
 description:         See the <https://github.com/lspitzner/butcher/blob/master/README.md README> (it is properly formatted on github).
 license:             BSD3
 license-file:        LICENSE
 author:              Lennart Spitzner
 maintainer:          Lennart Spitzner <hexagoxel@hexagoxel.de>
-copyright:           Copyright (C) 2016-2019 Lennart Spitzner
+copyright:           Copyright (C) 2016-2020 Lennart Spitzner
 category:            UI
 build-type:          Simple
 Stability:           experimental

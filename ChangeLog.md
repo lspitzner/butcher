@@ -1,5 +1,10 @@
 # Revision history for butcher
 
+## 1.3.3.0  -- April 2020
+
+* Fix bug with params with default when parsing from commandline
+* Add the `descendDescTo` function
+
 ## 1.3.2.3  -- June 2019
 
 * Fix broken build when using deque>=0.3
