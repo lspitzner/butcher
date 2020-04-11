@@ -1,5 +1,9 @@
 # Revision history for butcher
 
+## 1.3.3.1  -- April 2020
+
+* Fix a cabal file mistake
+
 ## 1.3.3.0  -- April 2020
 
 * Fix bug with params with default when parsing from commandline
