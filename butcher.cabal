@@ -34,8 +34,6 @@ library
                        UI.Butcher.Monadic.IO
                        UI.Butcher.Monadic.Interactive
                        UI.Butcher.Monadic.BuiltinCommands
-                       UI.Butcher.Applicative.Types
-                       UI.Butcher.Applicative
   other-modules:       UI.Butcher.Monadic.Internal.Types
                        UI.Butcher.Monadic.Internal.Core
   build-depends:
