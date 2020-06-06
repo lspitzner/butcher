@@ -111,6 +111,8 @@ test-suite tests
   main-is:          TestMain.hs
   other-modules:    
   hs-source-dirs:   src-tests
+  include-dirs:
+    srcinc
   default-extensions: {
     CPP
 
