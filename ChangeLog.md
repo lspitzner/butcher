@@ -1,5 +1,11 @@
 # Revision history for butcher
 
+## 1.3.3.2  -- June 2020
+
+* Support ghc-8.10
+* Fix a somewhat hidden issue in the cabal file
+* Add support for building / testing via haskell.nix nixpkgs overlay
+
 ## 1.3.3.1  -- April 2020
 
 * Fix a cabal file mistake
