@@ -318,6 +318,7 @@ type PartParsedData = Map Int [Dynamic]
 
 data CmdDescStack = StackBottom (Deque PartDesc)
                   | StackLayer  (Deque PartDesc) String CmdDescStack
+  deriving Show
 
 descStackAdd :: PartDesc -> CmdDescStack -> CmdDescStack
 descStackAdd d = \case
@@ -1023,6 +1024,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
               ++ " with remaining input: "
               ++ show input
             ]
+          mSet $ StackBottom mempty
           failureCurrentShallowRerun
           processParsedParts $ nextF monadMisuseError
         continueOrMisuse :: Maybe p -> m (CmdParser f out a)
