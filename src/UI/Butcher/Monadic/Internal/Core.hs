@@ -1024,8 +1024,6 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
               ++ " with remaining input: "
               ++ show input
             ]
-          mSet $ StackBottom mempty
-          failureCurrentShallowRerun
           processParsedParts $ nextF monadMisuseError
         continueOrMisuse :: Maybe p -> m (CmdParser f out a)
         continueOrMisuse = maybe monadMisuseError (processParsedParts . nextF)
@@ -1145,7 +1143,12 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
       mModify (descStackAdd desc)
       nextF =<< iterM processCmdShallow alt
 
-  failureCurrentShallowRerun
+  -- currently unused; was previously used during failure in
+  -- processParsedParts. Using this leads to duplicated descs, but I fear
+  -- that not using it also leads to certain problems (missing children?).
+  -- Probably want to re-write into proper two-phase 1) obtain desc 2) run
+  -- parser, like the applicative approach.
+  _failureCurrentShallowRerun
     :: ( m ~ MultiRWSS.MultiRWST r w s m0
        , MonadMultiState (CmdParser f out ()) m
        , MonadMultiState (CommandDesc out) m
@@ -1153,7 +1156,7 @@ runCmdParserAExt mTopLevel inputInitial cmdParser =
        , Monad m0
        )
     => m ()
-  failureCurrentShallowRerun = do
+  _failureCurrentShallowRerun = do
     parser :: CmdParser f out () <- mGet
     cmd :: CommandDesc out <-
       MultiRWSS.withMultiStateS emptyCommandDesc
