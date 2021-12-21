@@ -37,7 +37,7 @@ library
   other-modules:       UI.Butcher.Monadic.Internal.Types
                        UI.Butcher.Monadic.Internal.Core
   build-depends:
-    { base >=4.11 && <4.15
+    { base >=4.11 && <4.16
     , free < 5.2
     , unsafe < 0.1
     , microlens <0.5
@@ -109,7 +109,7 @@ test-suite tests
     }
   ghc-options:      -Wall -rtsopts
   main-is:          TestMain.hs
-  other-modules:    
+  other-modules:
   hs-source-dirs:   src-tests
   include-dirs:
     srcinc
